@@ -1120,3 +1120,24 @@ fn verify_state<BS: BlockStore>(
         assert_eq!(state.lane_states.len(), 0);
     }
 }
+
+fn verify_state<BS: BlockStore>(
+    rt: &mut MockRuntime<'_, BS>,
+    exp_lanes : i64,
+    expected_state : PState){
+    let state: PState = rt.get_state().unwrap();
+    assert_eq!(expected_state.to, state.to);
+    assert_eq!(expected_state.from, state.from);
+    assert_eq!(expected_state.min_settle_height, state.min_settle_height);
+    assert_eq!(expected_state.settling_at, state.settling_at);
+    assert_eq!(expected_state.to_send, state.to_send);
+
+    if exp_lanes > 0 {
+        assert_eq!(exp_lanes as u64 , state.lane_states.len() as u64 );
+        assert_eq!(expected_state.lane_states, state.lane_states);
+    }
+    else {
+        assert_eq!(state.lane_states.len(), 0);
+    }
+
+    }

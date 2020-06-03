@@ -162,6 +162,15 @@ where
         *self.expect_validate_caller_type.borrow_mut() = Some(ids.to_vec());
     }
 
+    pub fn expect_verify_signature(&mut self, sig : Signature, signer : Address, result : Option<String>){
+
+        self.expect_verify_sig = Some(ExpectedVerifySig{
+            sig : sig,
+            signer : signer,
+            result : result
+        });
+    }
+
     #[allow(dead_code)]
     pub fn expect_validate_caller_type(&self, ids: &[Cid]) {
         assert!(ids.len() > 0, "addrs must be non-empty");
