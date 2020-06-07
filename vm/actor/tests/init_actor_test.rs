@@ -17,6 +17,8 @@ use ipld_blockstore::BlockStore;
 use message::{Message, UnsignedMessage};
 use serde::Serialize;
 use vm::{ActorError, ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR};
+use runtime::{Syscalls};
+use interpreter::{DefaultSyscalls};
 
 fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
     let receiver = Address::new_id(1000);
@@ -25,7 +27,7 @@ fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
         .from(SYSTEM_ACTOR_ADDR.clone())
         .build()
         .unwrap();
-    let mut rt = MockRuntime::new(bs, message);
+    let mut rt = MockRuntime::new(bs, default_syscalls,message);
     rt.caller_type = SYSTEM_ACTOR_CODE_ID.clone();
     return rt;
 }
@@ -34,7 +36,8 @@ fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
 #[test]
 fn abort_cant_call_exec() {
     let bs = MemoryDB::default();
-    let mut rt = construct_runtime(&bs);
+    let default_syscalls = DefaultSyscalls::new(&bs);
+    let mut rt = construct_runtime(&bs, &default_syscalls);
     construct_and_verify(&mut rt);
     let anne = Address::new_id(1001);
 
@@ -163,7 +166,8 @@ fn create_storage_miner() {
 #[test]
 fn create_multisig_actor() {
     let bs = MemoryDB::default();
-    let mut rt = construct_runtime(&bs);
+    let default_syscalls = DefaultSyscalls::new(&bs);
+    let mut rt = construct_runtime(&bs, & default_syscalls);
     construct_and_verify(&mut rt);
 
     // Actor creating multisig actor
@@ -207,7 +211,8 @@ fn create_multisig_actor() {
 #[test]
 fn sending_constructor_failure() {
     let bs = MemoryDB::default();
-    let mut rt = construct_runtime(&bs);
+    let default_syscalls = DefaultSyscalls::new(&bs);
+    let mut rt = construct_runtime(&bs, &default_syscalls);
     construct_and_verify(&mut rt);
 
     // Only the storage power actor can create a miner

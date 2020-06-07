@@ -13,7 +13,9 @@ use db::MemoryDB;
 use ipld_blockstore::BlockStore;
 use message::UnsignedMessage;
 use std::panic;
-use vm::{Serialized, TokenAmount, METHOD_CONSTRUCTOR};
+use vm::{ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR};
+use runtime::{ Syscalls};
+use interpreter::{ DefaultSyscalls,};
 
 fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
     let message = UnsignedMessage::builder()
@@ -31,7 +33,8 @@ fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
 #[should_panic(expected = "actor current balance 0 insufficient to pay gas reward 10")]
 fn balance_less_than_reward() {
     let bs = MemoryDB::default();
-    let mut rt = construct_runtime(&bs);
+    let default_syscalls = DefaultSyscalls::new(&bs);
+    let mut rt = construct_runtime(&bs, & default_syscalls);
     construct_and_verify(&mut rt);
 
     let miner = Address::new_id(1000);

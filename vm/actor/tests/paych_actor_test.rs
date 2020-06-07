@@ -278,7 +278,8 @@ mod create_lane_tests {
                 .gas_limit(1000)
                 .build()
                 .unwrap();
-            let mut rt = MockRuntime::new(&bs, message);
+            let default_syscalls = DefaultSyscalls::new(&bs);
+            let mut rt = MockRuntime::new(&bs, &default_syscalls, message);
             rt.epoch = test_case.epoch;
             rt.balance = TokenAmount::from(paych_balance.clone());
             rt.set_caller(INIT_ACTOR_CODE_ID.clone(), init_actor_addr);
@@ -1073,8 +1074,8 @@ fn require_add_new_lane<BS: BlockStore>(
     }
 }
 
-fn construct_and_verify<BS: BlockStore>(
-    rt: &mut MockRuntime<'_, BS>,
+fn construct_and_verify<BS: BlockStore, SYS: Syscalls>(
+    rt: &mut MockRuntime<'_, '_, BS, SYS>,
     sender: Address,
     receiver: Address,
 ) {
@@ -1092,8 +1093,8 @@ fn construct_and_verify<BS: BlockStore>(
     verify_initial_state(rt, sender, receiver);
 }
 
-fn verify_initial_state<BS: BlockStore>(
-    rt: &mut MockRuntime<'_, BS>,
+fn verify_initial_state<BS: BlockStore, SYS: Syscalls>(
+    rt: &mut MockRuntime<'_, '_, BS, SYS>,
     sender: Address,
     receiver: Address,
 ) {
@@ -1121,10 +1122,11 @@ fn verify_state<BS: BlockStore>(
     }
 }
 
-fn verify_state<BS: BlockStore>(
-    rt: &mut MockRuntime<'_, BS>,
-    exp_lanes : i64,
-    expected_state : PState){
+fn verify_state<BS: BlockStore, SYS: Syscalls>(
+    rt: &mut MockRuntime<'_, '_, BS, SYS>,
+    exp_lanes: i64,
+    expected_state: PState,
+) {
     let state: PState = rt.get_state().unwrap();
     assert_eq!(expected_state.to, state.to);
     assert_eq!(expected_state.from, state.from);
@@ -1133,11 +1135,9 @@ fn verify_state<BS: BlockStore>(
     assert_eq!(expected_state.to_send, state.to_send);
 
     if exp_lanes > 0 {
-        assert_eq!(exp_lanes as u64 , state.lane_states.len() as u64 );
+        assert_eq!(exp_lanes as u64, state.lane_states.len() as u64);
         assert_eq!(expected_state.lane_states, state.lane_states);
-    }
-    else {
+    } else {
         assert_eq!(state.lane_states.len(), 0);
     }
-
-    }
+}

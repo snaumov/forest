@@ -19,8 +19,14 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::error::Error as StdError;
 use vm::{ActorError, ExitCode, MethodNum, Randomness, Serialized, TokenAmount};
+//use interpreter::gas_syscalls::GasSyscalls;
+use interpreter::{internal_send, ChainRand, DefaultRuntime, DefaultSyscalls, GasSyscalls};
+use interpreter::{price_list_by_epoch, GasTracker};
 
-pub struct MockRuntime<'a, BS: BlockStore> {
+use std::rc::Rc;
+//use super::gas_tracker::{price_list_by_epoch, GasTracker, PriceList};
+
+pub struct MockRuntime<'a, 'sys, BS, SYS> {
     pub epoch: ChainEpoch,
     pub caller_type: Cid,
     pub miner: Address,
@@ -29,6 +35,7 @@ pub struct MockRuntime<'a, BS: BlockStore> {
     pub actor_code_cids: HashMap<Address, Cid>,
     pub new_actor_addr: Option<Address>,
     pub message: UnsignedMessage,
+    syscalls: GasSyscalls<'sys, SYS>,
 
     // TODO: syscalls: syscaller
 
@@ -108,6 +115,7 @@ where
             state: None,
             balance: 0u8.into(),
             received: 0u8.into(),
+            syscalls: gas_syscalls,
 
             // VM Impl
             in_call: false,
@@ -162,12 +170,16 @@ where
         *self.expect_validate_caller_type.borrow_mut() = Some(ids.to_vec());
     }
 
-    pub fn expect_verify_signature(&mut self, sig : Signature, signer : Address, result : Option<String>){
-
-        self.expect_verify_sig = Some(ExpectedVerifySig{
-            sig : sig,
-            signer : signer,
-            result : result
+    pub fn expect_verify_signature(
+        &mut self,
+        sig: Signature,
+        signer: Address,
+        result: Option<String>,
+    ) {
+        self.expect_verify_sig = Some(ExpectedVerifySig {
+            sig: sig,
+            signer: signer,
+            result: result,
         });
     }
 
