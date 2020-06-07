@@ -9,11 +9,11 @@ use actor::{
 use address::Address;
 use common::*;
 use db::MemoryDB;
+use interpreter::DefaultSyscalls;
 use ipld_blockstore::BlockStore;
 use message::UnsignedMessage;
+use runtime::Syscalls;
 use vm::{ExitCode, Serialized};
-use runtime::{ Syscalls};
-use interpreter::{DefaultSyscalls};
 
 fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
     let receiver = Address::new_id(100);
@@ -153,7 +153,10 @@ fn epoch_tick_with_entries() {
     epoch_tick_and_verify(&mut rt);
 }
 
-fn construct_and_verify<BS: BlockStore, SYS: Syscalls>(rt: &mut MockRuntime<'_,'_, BS, SYS>, params: &ConstructorParams) {
+fn construct_and_verify<BS: BlockStore, SYS: Syscalls>(
+    rt: &mut MockRuntime<'_, '_, BS, SYS>,
+    params: &ConstructorParams,
+) {
     rt.expect_validate_caller_addr(&[*SYSTEM_ACTOR_ADDR]);
     let ret = rt
         .call(
