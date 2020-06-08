@@ -33,8 +33,7 @@ fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {
 #[should_panic(expected = "actor current balance 0 insufficient to pay gas reward 10")]
 fn balance_less_than_reward() {
     let bs = MemoryDB::default();
-    let default_syscalls = DefaultSyscalls::new(&bs);
-    let mut rt = construct_runtime(&bs, &default_syscalls);
+    let mut rt = construct_runtime(&bs);
     construct_and_verify(&mut rt);
 
     let miner = Address::new_id(1000);
