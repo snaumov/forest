@@ -21,16 +21,13 @@ use std::error::Error as StdError;
 use vm::{ActorError, ExitCode, MethodNum, Randomness, Serialized, TokenAmount};
 //use interpreter::gas_syscalls::GasSyscalls;
 use fil_types::{
-    zero_piece_commitment, PaddedPieceSize, PieceInfo, RegisteredProof, SealVerifyInfo, SectorInfo,
+    PieceInfo, RegisteredProof, SealVerifyInfo,
     WindowPoStVerifyInfo,
 };
-use interpreter::{internal_send, ChainRand, DefaultRuntime, DefaultSyscalls, GasSyscalls};
-use interpreter::{price_list_by_epoch, GasTracker};
-use runtime::{ConsensusFault, ConsensusFaultType};
+
+use runtime::{ConsensusFault};
 use std::error::Error as StdError;
 
-use std::rc::Rc;
-//use super::gas_tracker::{price_list_by_epoch, GasTracker, PriceList};
 
 pub struct MockRuntime<'a, BS: BlockStore> {
     pub epoch: ChainEpoch,
