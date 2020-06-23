@@ -107,6 +107,7 @@ impl State {
         s: &BS,
         txn_id: TxnID,
     ) -> Result<(), String> {
+        println!("Calling delete pending func");
         let mut map: Hamt<BytesKey, _> = Hamt::load_with_bit_width(&self.pending_txs, s, 5)?;
         self.pending_txs = map.flush()?;
         map.delete(&txn_id.key())?;

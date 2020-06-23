@@ -190,6 +190,7 @@ fn assert_transactions<'a, BS: BlockStore>(
     let mut count = 0;
     assert!(map
         .for_each(|_, value: Transaction| {
+            println!("Value is {:?}", value);
             assert_eq!(value, expected[count]);
             count += 1;
             Ok(())
