@@ -20,11 +20,13 @@ pub const SECTOR_TERMINATION_FAULTY: SectorTermination = 3;
 
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct CreateMinerParams {
-    owner_addr: Address,
-    worker_addr: Address,
-    seal_proof_type: RegisteredSealProof,
+    pub owner_addr: Address,
+    pub worker_addr: Address,
+    pub seal_proof_type: RegisteredSealProof,
     #[serde(with = "serde_bytes")]
-    peer_id: Vec<u8>,
+    pub peer_id: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub multi_addrs: Vec<u8>,
 }
 
 #[derive(Clone, Serialize_tuple, Deserialize_tuple)]

@@ -12,7 +12,8 @@ use crate::reward::Method as RewardMethod;
 use crate::{
     check_empty_params, init, make_map, request_miner_control_addrs, Multimap, SetMultimap,
     CALLER_TYPES_SIGNABLE, CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID,
-    REWARD_ACTOR_ADDR,
+    REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
+    init::{Method as InitMethod, ExecParams as InitExecParams},
 };
 use address::Address;
 use fil_types::{SealVerifyInfo, StoragePower};
@@ -54,6 +55,7 @@ impl Actor {
         BS: BlockStore,
         RT: Runtime<BS>,
     {
+        rt.validate_immediate_caller_is(&[SYSTEM_ACTOR_ADDR.clone()] )?;
         let empty_map = make_map(rt.store()).flush().map_err(|err| {
             rt.abort(
                 ExitCode::ErrIllegalState,
@@ -81,11 +83,18 @@ impl Actor {
         RT: Runtime<BS>,
     {
         rt.validate_immediate_caller_type(CALLER_TYPES_SIGNABLE.iter())?;
-        let value = rt.message().value().clone();
-        // TODO update this send, is now outdated
-        let addresses: init::ExecReturn = rt
-            .send(&INIT_ACTOR_ADDR, init::Method::Exec as u64, params, &value)?
-            .deserialize()?;
+
+
+        let cto_params : CreateMinerParams = Serialized::deserialize(params).unwrap();
+
+        let value_recieved = rt.message().value().to_owned();
+
+        let  init_exec_param = InitExecParams {
+            code_cid: MINER_ACTOR_CODE_ID.clone(),
+            constructor_params: Serialized::serialize(cto_params).unwrap(),
+        };
+        let addresses : init::ExecReturn =  rt.send(&*INIT_ACTOR_ADDR,  InitMethod::Exec as u64, &Serialized::serialize(init_exec_param).unwrap(), &value_recieved)?.deserialize()?;
+
 
         rt.transaction::<State, Result<(), ActorError>, _>(|st, rt| {
             st.set_claim(rt.store(), &addresses.id_address, Claim::default())

@@ -33,6 +33,8 @@ pub struct MockRuntime<'a, BS: BlockStore> {
     // Actor State
     pub state: Option<Cid>,
     pub balance: TokenAmount,
+    pub received: TokenAmount,
+
 
     // VM Impl
     pub in_call: bool,
@@ -79,6 +81,8 @@ impl<'a, BS: BlockStore> MockRuntime<'a, BS> {
             message: message,
             state: None,
             balance: 0u8.into(),
+            received: 0u8.into(),
+
 
             // VM Impl
             in_call: false,
@@ -124,6 +128,11 @@ impl<'a, BS: BlockStore> MockRuntime<'a, BS> {
     pub fn expect_validate_caller_addr(&self, addr: &[Address]) {
         assert!(addr.len() > 0, "addrs must be non-empty");
         *self.expect_validate_caller_addr.borrow_mut() = Some(addr.to_vec());
+    }
+
+    pub fn expect_validate_caller_type(&self, ids: &[Cid]) {
+        assert!(ids.len() > 0, "addrs must be non-empty");
+        *self.expect_validate_caller_type.borrow_mut() = Some(ids.to_vec());
     }
 
     #[allow(dead_code)]
