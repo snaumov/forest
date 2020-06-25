@@ -2585,6 +2585,7 @@ dependencies = [
  "futures 0.3.5",
  "futures-util",
  "futures_codec",
+ "ipld_blockstore",
  "libp2p",
  "log",
  "multihash 0.10.1",
