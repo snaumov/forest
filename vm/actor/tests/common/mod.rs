@@ -166,6 +166,8 @@ where
         assert!(addr.len() > 0, "addrs must be non-empty");
         *self.expect_validate_caller_addr.borrow_mut() = Some(addr.to_vec());
     }
+
+    #[allow(dead_code)]
     pub fn expect_validate_caller_type(&self, ids: &[Cid]) {
         assert!(ids.len() > 0, "addrs must be non-empty");
         *self.expect_validate_caller_type.borrow_mut() = Some(ids.to_vec());
@@ -525,7 +527,6 @@ where
         value: &TokenAmount,
     ) -> Result<Serialized, ActorError> {
         self.require_in_call();
-        //println!("IN the send func");
         if self.in_transaction {
             return Err(self.abort(
                 ExitCode::SysErrorIllegalActor,

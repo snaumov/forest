@@ -68,7 +68,6 @@ impl Actor {
         };
 
         if params.unlock_duration != 0 {
-            //println!("Using message stufff nboiiiiiii, message value is {}", rt.message().value().clone());
             st.initial_balance = rt.message().value().clone();
             st.unlock_duration = params.unlock_duration;
             st.start_epoch = rt.curr_epoch();
@@ -253,6 +252,7 @@ impl Actor {
 
             // Remove signer from state
             st.signers.retain(|s| s != &params.signer);
+
 
             // Decrease approvals threshold if decrease param or below threshold
             if params.decrease {
