@@ -5,7 +5,7 @@ mod common;
 
 use actor::{
     init::{ConstructorParams, ExecParams, ExecReturn, Method as INIT_METHOD},
-    power::{CreateMinerParams, CreateMinerReturn, Method,  State},
+    power::{CreateMinerParams, CreateMinerReturn, Method,  State, Claim, CONSENSUS_MINER_MIN_POWER},
     multisig::{Transaction},
     Multimap, Set, ACCOUNT_ACTOR_CODE_ID, FIRST_NON_SINGLETON_ADDR, INIT_ACTOR_ADDR,
     INIT_ACTOR_CODE_ID, MINER_ACTOR_CODE_ID, MULTISIG_ACTOR_CODE_ID, PAYCH_ACTOR_CODE_ID,
@@ -25,12 +25,15 @@ use num_bigint::BigUint;
 use serde::Serialize;
 use vm::{ActorError, ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR, METHOD_SEND};
 
+
+
+// Need to be super careful with this func. Change the type you are trafersing. Probably inlcude a type paramteter so you cna easily chekc what you are ocunting
 fn verify_map_size<BS: BlockStore>(rt: &mut MockRuntime<'_, BS>, cid: Cid,expected : u64) {
     
     let map: Hamt<BytesKey, _> = Hamt::load(&cid, rt.store).unwrap();
     let mut count = 0;
     map
-        .for_each(|_, _: Transaction| {
+        .for_each(|_, _: Claim| {
             count += 1;
             Ok(())
         }).unwrap();
@@ -93,8 +96,8 @@ fn create_miner<BS: BlockStore>(
 
     rt.set_caller(ACCOUNT_ACTOR_CODE_ID.clone(), owner.clone());
     rt.balance = value.clone();
-    rt.received = value.clone();
-
+    rt.set_recieved(value.clone());
+    
     rt.expect_validate_caller_type(&[
         ACCOUNT_ACTOR_CODE_ID.clone(),
         MULTISIG_ACTOR_CODE_ID.clone(),
@@ -141,6 +144,36 @@ fn create_miner<BS: BlockStore>(
         )
         .is_ok());
     rt.verify();
+}
+
+fn create_miner_basic<BS: BlockStore>(
+    rt: &mut MockRuntime<'_, BS>,
+    miner_seq : &mut u64,
+    owner: Address,
+    worker: Address,
+    miner: Address){
+
+        let label = miner_seq.to_string();
+        let actor_addr = Address::new_actor(label.as_bytes());
+        *miner_seq  = *miner_seq + 1 ;
+        create_miner(
+            rt,
+            owner.clone(),
+            worker.clone(),
+            miner.clone(),
+            actor_addr,
+            label.as_bytes().to_vec(),
+            vec![],
+            RegisteredSealProof::StackedDRG2KiBV1,
+            TokenAmount::from(0u8),
+        );
+}
+
+fn current_power_total<BS:BlockStore>(rt : &mut MockRuntime<'_, BS>){
+
+    // rt.expect_validate_caller_any();
+    // let ret = rt.call(to_code: &Cid, Method::, Serialized::default())
+
 }
 
 mod test_construction {
@@ -195,17 +228,61 @@ mod test_construction {
         assert_eq!(StoragePower::from(0u8), state.total_raw_byte_power);
         assert_eq!(0, state.num_miners_meeting_min_power);
 
-        let claim_map = Set::from_root(rt.store, &state.claims).unwrap();
-        let keys = claim_map.collect_keys().unwrap();
-        assert_eq!(1, keys.len());
+         //let claim_map = Set::from_root(rt.store, &state.claims).unwrap();
+        // let keys = claim_map.collect_keys().unwrap();
+        // assert_eq!(1, keys.len());
 
-        let claim_map: Hamt<BytesKey, _> = Hamt::load(&state.claims, rt.store).unwrap();
+        
 
-        verify_map_size(&mut rt, state.claims, 1);
+        verify_map_size(&mut rt, state.claims.clone(), 1);
 
 
-        //assert!(claim_map.get(&keys[0]).unwrap().is_some());
+        // let map: Hamt<BytesKey, _> = Hamt::load(&state.claims, rt.store).unwrap();
+        // let claim_map = Set::from_root(rt.store, &state.claims).unwrap();
+        // let keys = claim_map.collect_keys().unwrap();
+        // assert!(map.get::<_,Claim>(&keys[0]).unwrap().is_some());
 
         verify_empty_map(&mut rt, state.cron_event_queue);
     }
+}
+
+mod power_and_pledge{
+    use super::*;
+    const OWNER: u64 = 101;
+    const MINER_1: u64 = 111;
+    const MINER_2: u64 = 112;
+
+    fn construct_runtime<BS: BlockStore>(bs: &BS) -> MockRuntime<'_, BS> {
+        let message = UnsignedMessage::builder()
+            .to(STORAGE_POWER_ACTOR_ADDR.clone())
+            .from(SYSTEM_ACTOR_ADDR.clone())
+            .build()
+            .unwrap();
+        let mut rt = MockRuntime::new(bs, message);
+        rt.set_caller(SYSTEM_ACTOR_CODE_ID.clone(), SYSTEM_ACTOR_ADDR.clone());
+        construct_and_verify(&mut rt);
+        return rt;
+    }
+ 
+    #[test]
+    fn power_and_pledge_accounted(){
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let owner = Address::new_id(OWNER);
+        let miner1 = Address::new_id(MINER_1);
+        let miner2 = Address::new_id(MINER_2);
+
+        let mut miner_seq = 0;
+        create_miner_basic( &mut rt, &mut miner_seq, owner.clone(), owner.clone(), miner1.clone());
+        create_miner_basic( &mut rt, &mut miner_seq, owner.clone(), owner.clone(), miner2.clone());
+
+        // Current power total method requires method update
+
+
+
+        
+
+    }
+
+
 }
