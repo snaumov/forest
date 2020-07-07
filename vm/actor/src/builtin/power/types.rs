@@ -5,7 +5,7 @@ use crate::DealWeight;
 use address::Address;
 use clock::ChainEpoch;
 use encoding::{serde_bytes, tuple::*, Cbor};
-use fil_types::{RegisteredSealProof, SectorSize};
+use fil_types::{RegisteredSealProof, SectorSize, StoragePower};
 use num_bigint::biguint_ser;
 use vm::{Serialized, TokenAmount};
 
@@ -113,4 +113,22 @@ pub struct OnFaultBeginParams {
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct OnFaultEndParams {
     pub weights: Vec<SectorStorageWeightDesc>, // TODO: replace with power if it can be computed by miner
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct CurrentTotalPowerReturn {
+    #[serde(with = "biguint_ser")]
+    pub raw_byte_power: StoragePower, // TODO: replace with power if it can be computed by miner
+    #[serde(with = "biguint_ser")]
+    pub quality_adj_power: StoragePower,
+    #[serde(with = "biguint_ser")]
+    pub pledge_collateral: TokenAmount,
+}
+
+#[derive(Serialize_tuple, Deserialize_tuple)]
+pub struct UpdateClaimedPowerParams {
+    #[serde(with = "biguint_ser")]
+    pub raw_byte_power: StoragePower, // TODO: replace with power if it can be computed by miner
+    #[serde(with = "biguint_ser")]
+    pub quality_adj_delta: StoragePower,
 }

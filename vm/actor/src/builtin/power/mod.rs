@@ -10,10 +10,10 @@ pub use self::state::{Claim, CronEvent, State};
 pub use self::types::*;
 use crate::reward::Method as RewardMethod;
 use crate::{
-    check_empty_params, init, make_map, request_miner_control_addrs, Multimap, SetMultimap,
-    CALLER_TYPES_SIGNABLE, CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID,
-    REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
-    init::{Method as InitMethod, ExecParams as InitExecParams},
+    check_empty_params, init,
+    init::{ExecParams as InitExecParams, Method as InitMethod},
+    make_map, request_miner_control_addrs, Multimap, SetMultimap, CALLER_TYPES_SIGNABLE,
+    CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID, REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
 };
 use address::Address;
 use fil_types::{SealVerifyInfo, StoragePower};
@@ -33,17 +33,25 @@ pub enum Method {
     /// Constructor for Storage Power Actor
     Constructor = METHOD_CONSTRUCTOR,
     CreateMiner = 2,
-    DeleteMiner = 3,
-    OnSectorProveCommit = 4,
-    OnSectorTerminate = 5,
-    OnFaultBegin = 6,
-    OnFaultEnd = 7,
-    OnSectorModifyWeightDesc = 8,
-    EnrollCronEvent = 9,
-    OnEpochTickEnd = 10,
-    UpdatePledgeTotal = 11,
-    OnConsensusFault = 12,
-    SubmitPoRepForBulkVerify = 13,
+    UpdateClaimedPower = 3,
+    EnrollCronEvent = 4,
+    OnEpochTickEnd = 5,
+    UpdatePledgeTotal = 6,
+    OnConsensusFault = 7,
+    SubmitPoRepForBulkVerify = 8,
+    CurrentTotalPower = 9,
+
+    // DeleteMiner = 3,
+    OnSectorProveCommit,
+    OnSectorTerminate,
+    OnFaultBegin,
+    OnFaultEnd,
+    OnSectorModifyWeightDesc,
+    // EnrollCronEvent = 9,
+    // OnEpochTickEnd = 10,
+    // UpdatePledgeTotal = 11,
+    // OnConsensusFault = 12,
+    // SubmitPoRepForBulkVerify = 13,
 }
 
 /// Storage Power Actor
@@ -55,7 +63,7 @@ impl Actor {
         BS: BlockStore,
         RT: Runtime<BS>,
     {
-        rt.validate_immediate_caller_is(&[SYSTEM_ACTOR_ADDR.clone()] )?;
+        rt.validate_immediate_caller_is(&[SYSTEM_ACTOR_ADDR.clone()])?;
         let empty_map = make_map(rt.store()).flush().map_err(|err| {
             rt.abort(
                 ExitCode::ErrIllegalState,
@@ -84,17 +92,22 @@ impl Actor {
     {
         rt.validate_immediate_caller_type(CALLER_TYPES_SIGNABLE.iter())?;
 
-
-        let cto_params : CreateMinerParams = Serialized::deserialize(params).unwrap();
+        let cto_params: CreateMinerParams = Serialized::deserialize(params).unwrap();
 
         let value_recieved = rt.message().value().to_owned();
 
-        let  init_exec_param = InitExecParams {
+        let init_exec_param = InitExecParams {
             code_cid: MINER_ACTOR_CODE_ID.clone(),
             constructor_params: Serialized::serialize(cto_params).unwrap(),
         };
-        let addresses : init::ExecReturn =  rt.send(&*INIT_ACTOR_ADDR,  InitMethod::Exec as u64, &Serialized::serialize(init_exec_param).unwrap(), &value_recieved)?.deserialize()?;
-
+        let addresses: init::ExecReturn = rt
+            .send(
+                &*INIT_ACTOR_ADDR,
+                InitMethod::Exec as u64,
+                &Serialized::serialize(init_exec_param).unwrap(),
+                &value_recieved,
+            )?
+            .deserialize()?;
 
         rt.transaction::<State, Result<(), ActorError>, _>(|st, rt| {
             st.set_claim(rt.store(), &addresses.id_address, Claim::default())
@@ -219,6 +232,7 @@ impl Actor {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn on_fault_begin<BS, RT>(rt: &mut RT, params: OnFaultBeginParams) -> Result<(), ActorError>
     where
         BS: BlockStore,
@@ -239,6 +253,7 @@ impl Actor {
         })?
     }
 
+    #[allow(dead_code)]
     fn on_fault_end<BS, RT>(rt: &mut RT, params: OnFaultEndParams) -> Result<(), ActorError>
     where
         BS: BlockStore,
@@ -484,6 +499,20 @@ impl Actor {
             Ok(())
         })?
     }
+
+    fn current_total_power<BS, RT>(rt: &mut RT) -> Result<CurrentTotalPowerReturn, ActorError>
+    where
+        BS: BlockStore,
+        RT: Runtime<BS>,
+    {
+        rt.validate_immediate_caller_accept_any();
+        let state: State = rt.state()?;
+        Ok(CurrentTotalPowerReturn {
+            raw_byte_power: state.total_raw_byte_power, // TODO: replace with power if it can be computed by miner
+            quality_adj_power: state.total_quality_adj_power,
+            pledge_collateral: state.total_pledge_collateral,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -551,30 +580,30 @@ impl ActorCode for Actor {
                 let res = Self::create_miner(rt, params)?;
                 Ok(Serialized::serialize(res)?)
             }
-            Some(Method::DeleteMiner) => {
-                Self::delete_miner(rt, params.deserialize()?)?;
-                Ok(Serialized::default())
-            }
-            Some(Method::OnSectorProveCommit) => {
-                let res = Self::on_sector_prove_commit(rt, params.deserialize()?)?;
-                Ok(Serialized::serialize(BigUintSer(&res))?)
-            }
-            Some(Method::OnSectorTerminate) => {
-                Self::on_sector_terminate(rt, params.deserialize()?)?;
-                Ok(Serialized::default())
-            }
-            Some(Method::OnFaultBegin) => {
-                Self::on_fault_begin(rt, params.deserialize()?)?;
-                Ok(Serialized::default())
-            }
-            Some(Method::OnFaultEnd) => {
-                Self::on_fault_end(rt, params.deserialize()?)?;
-                Ok(Serialized::default())
-            }
-            Some(Method::OnSectorModifyWeightDesc) => {
-                let res = Self::on_sector_modify_weight_desc(rt, params.deserialize()?)?;
-                Ok(Serialized::serialize(BigUintSer(&res))?)
-            }
+            // Some(Method::DeleteMiner) => {
+            //     Self::delete_miner(rt, params.deserialize()?)?;
+            //     Ok(Serialized::default())
+            // }
+            // Some(Method::OnSectorProveCommit) => {
+            //     let res = Self::on_sector_prove_commit(rt, params.deserialize()?)?;
+            //     Ok(Serialized::serialize(BigUintSer(&res))?)
+            // }
+            // Some(Method::OnSectorTerminate) => {
+            //     Self::on_sector_terminate(rt, params.deserialize()?)?;
+            //     Ok(Serialized::default())
+            // }
+            // Some(Method::OnFaultBegin) => {
+            //     Self::on_fault_begin(rt, params.deserialize()?)?;
+            //     Ok(Serialized::default())
+            // }
+            // Some(Method::OnFaultEnd) => {
+            //     Self::on_fault_end(rt, params.deserialize()?)?;
+            //     Ok(Serialized::default())
+            // }
+            // Some(Method::OnSectorModifyWeightDesc) => {
+            //     let res = Self::on_sector_modify_weight_desc(rt, params.deserialize()?)?;
+            //     Ok(Serialized::serialize(BigUintSer(&res))?)
+            // }
             Some(Method::EnrollCronEvent) => {
                 Self::enroll_cron_event(rt, params.deserialize()?)?;
                 Ok(Serialized::default())
@@ -597,6 +626,11 @@ impl ActorCode for Actor {
             Some(Method::SubmitPoRepForBulkVerify) => {
                 Self::submit_porep_for_bulk_verify(rt, params.deserialize()?)?;
                 Ok(Serialized::default())
+            }
+
+            Some(Method::CurrentTotalPower) => {
+                let v = Self::current_total_power(rt)?;
+                Ok(Serialized::serialize(v)?)
             }
             _ => Err(rt.abort(ExitCode::SysErrInvalidMethod, "Invalid method")),
         }
