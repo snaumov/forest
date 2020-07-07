@@ -13,13 +13,12 @@ pub use self::types::*;
 use crate::{
     make_map, request_miner_control_addrs,
     verifreg::{BytesParams, Method as VerifregMethod},
-    BalanceTable, DealID, OptionalEpoch, SetMultimap, BURNT_FUNDS_ACTOR_ADDR,
-    CALLER_TYPES_SIGNABLE, CRON_ACTOR_ADDR, MINER_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR,
-    VERIFIED_REGISTRY_ACTOR_ADDR,
+    BalanceTable, DealID, SetMultimap, BURNT_FUNDS_ACTOR_ADDR, CALLER_TYPES_SIGNABLE,
+    CRON_ACTOR_ADDR, MINER_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR, VERIFIED_REGISTRY_ACTOR_ADDR,
 };
 use address::Address;
 use cid::Cid;
-use clock::ChainEpoch;
+use clock::{ChainEpoch, EPOCH_UNDEFINED};
 use encoding::to_vec;
 use fil_types::PieceInfo;
 use ipld_amt::Amt;
@@ -300,7 +299,6 @@ impl Actor {
         let miner_addr = *rt.message().from();
         let mut total_deal_space_time = BigUint::zero();
         let mut total_verified_deal_space_time = BigUint::zero();
-
         rt.transaction::<State, Result<(), ActorError>, _>(|st, rt| {
             // if there are no dealIDs, it is a CommittedCapacity sector
             // and the totalDealSpaceTime should be zero
@@ -343,15 +341,15 @@ impl Actor {
                     .set(
                         *id,
                         DealState {
-                            sector_start_epoch: OptionalEpoch(Some(rt.curr_epoch())),
-                            last_updated_epoch: OptionalEpoch(None),
-                            slash_epoch: OptionalEpoch(None),
+                            sector_start_epoch: rt.curr_epoch(),
+                            last_updated_epoch: EPOCH_UNDEFINED,
+                            slash_epoch: EPOCH_UNDEFINED,
                         },
                     )
                     .map_err(|e| ActorError::new(ExitCode::ErrIllegalState, e.into()))?;
 
                 // compute deal weight
-                let deal_space_time = proposal.duration() * proposal.piece_size.0;
+                let deal_space_time = proposal.duration() as u64 * proposal.piece_size.0;
                 if proposal.verified_deal {
                     total_verified_deal_space_time += deal_space_time;
                 } else {
@@ -367,7 +365,6 @@ impl Actor {
             st.states = states
                 .flush()
                 .map_err(|e| ActorError::new(ExitCode::ErrIllegalState, e.into()))?;
-
             Ok(())
         })??;
 
@@ -423,7 +420,7 @@ impl Actor {
                 // to indicate that processDealSlashed should be called when the deferred state computation
                 // is performed. // TODO: Do that here
 
-                state.slash_epoch = OptionalEpoch(Some(rt.curr_epoch()));
+                state.slash_epoch = rt.curr_epoch();
                 states.set(id, state).map_err(|e| {
                     ActorError::new(ExitCode::ErrIllegalState, format!("Set deal error: {}", e))
                 })?;
@@ -478,6 +475,7 @@ impl Actor {
         RT: Runtime<BS>,
     {
         rt.validate_immediate_caller_is(std::iter::once(&*CRON_ACTOR_ADDR))?;
+
         let mut amount_slashed = BigUint::zero();
         let mut timed_out_verified_deals: Vec<DealProposal> = Vec::new();
 
@@ -516,7 +514,7 @@ impl Actor {
 
                     let deal = st.must_get_deal(rt.store(), id)?;
                     // Not yet appeared in proven sector; check for timeout.
-                    if state.sector_start_epoch.is_none() {
+                    if state.sector_start_epoch == EPOCH_UNDEFINED {
                         assert!(
                             rt.curr_epoch() >= deal.start_epoch,
                             "if sector start is not set, we must be in a timed out state"
@@ -548,11 +546,11 @@ impl Actor {
                     )?;
                     amount_slashed += slash_amount;
 
-                    if next_epoch.is_some() {
-                        assert!(next_epoch.unwrap() > rt.curr_epoch());
+                    if next_epoch != EPOCH_UNDEFINED {
+                        assert!(next_epoch > rt.curr_epoch());
 
                         // TODO: can we avoid having this field?
-                        state.last_updated_epoch = OptionalEpoch(Some(rt.curr_epoch()));
+                        state.last_updated_epoch = rt.curr_epoch();
 
                         states.set(id, state).map_err(|e| {
                             ActorError::new(
@@ -560,9 +558,7 @@ impl Actor {
                                 format!("failed to get deal: {}", e),
                             )
                         })?;
-                        if let OptionalEpoch(Some(idx)) = next_epoch {
-                            updates_needed.push((idx, id));
-                        }
+                        updates_needed.push((next_epoch, id));
                     }
                     Ok(())
                 })
@@ -633,7 +629,6 @@ impl Actor {
             &Serialized::default(),
             &amount_slashed,
         )?;
-
         Ok(())
     }
 }

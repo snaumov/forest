@@ -143,7 +143,6 @@ impl<'a, BS: BlockStore> MockRuntime<'a, BS> {
             .value(value)
             .build()
             .unwrap();
-    }
 
     #[allow(dead_code)]
     pub fn expect_validate_caller_any(&self) {
@@ -276,6 +275,16 @@ impl<'a, BS: BlockStore> MockRuntime<'a, BS> {
             .unwrap();
         self.caller_type = code_id.clone();
         self.actor_code_cids.insert(address, code_id);
+    }
+
+    #[allow(dead_code)]
+    pub fn set_value(&mut self, value: TokenAmount) {
+        self.message = UnsignedMessage::builder()
+            .to(self.message.to().clone())
+            .from(self.message.from().clone())
+            .value(value)
+            .build()
+            .unwrap();
     }
 }
 
