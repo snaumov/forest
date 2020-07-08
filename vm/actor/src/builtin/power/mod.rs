@@ -433,12 +433,10 @@ impl Actor {
                     println!("Failed to remove");
                 }
                 }
-                //zero out miner
             }
             Ok(())
         });
         Ok(())
-
     }
 
     pub fn on_epoch_tick_end<BS, RT>(rt: &mut RT) -> Result<(), ActorError>
