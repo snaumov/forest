@@ -46,8 +46,38 @@ pub(super) async fn process(command: Subcommand) {
                     "Sector size option must be chosen. Choose between --all, --keys, or <size>"
                 );
             };
-
             get_params_default(sizes, verbose).await.unwrap();
+        },
+
+        Subcommand::ChainSync{
+          status,
+          wait,
+          check_bad,
+          mark_bad,
+          submit
+        } =>{
+            if status{
+                println!("CHain sync status stuff");
+            }
+            else if wait {
+                println!("CHain sync wait stuff");
+
+            }
+            else if let Some(block) = check_bad{
+                println!(" Chain sync check bad stuff block : {}", block);
+
+            }
+            else if let Some(block) = mark_bad{
+                println!("Chain sync mark bad stuff : {}", block);
+
+            }
+            else if let Some(block) = submit{
+                println!("Chain sync submmit stuff : {}", block);
+
+            }
+            else{
+                println!("Option must be chosen");
+            }
         }
     }
 }

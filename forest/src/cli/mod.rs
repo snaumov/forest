@@ -47,6 +47,22 @@ pub enum Subcommand {
         #[structopt(short, long, help = "Show verbose logging")]
         verbose: bool,
     },
+    #[structopt(
+        name = "chain-sync",
+        about = "Chain sync commands"
+    )]
+    ChainSync {
+        #[structopt(short, long, help = "Current status of chain sync")]
+        status : bool,
+        #[structopt(short, long, help = "Wait for sync to be complete")]
+        wait : bool,
+        #[structopt(short, long, help = "Check if the given block was marked bad, and for what reason")]
+        check_bad : Option<String>,
+        #[structopt(short, long, help = "Mark the given block as bad, will prevent syncing to a chain that contains it")]
+        mark_bad : Option<String>,
+        #[structopt(short = "sub", long, help = "Submit newly created block to network through node")]
+        submit : Option<String>,
+    },
 }
 
 /// Daemon process command line options.
