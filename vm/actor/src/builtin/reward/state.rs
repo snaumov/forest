@@ -5,16 +5,16 @@ use super::types::*;
 use clock::ChainEpoch;
 use encoding::{repr::*, tuple::*, Cbor};
 use fil_types::{Spacetime, StoragePower};
-use num_bigint::biguint_ser;
+use num_bigint::{biguint_ser, bigint_ser};
 use num_derive::FromPrimitive;
 use vm::TokenAmount;
 
 /// Reward actor state
 #[derive(Serialize_tuple, Deserialize_tuple, Default)]
 pub struct State {
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub baseline_power: StoragePower,
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub realized_power: StoragePower,
     #[serde(with = "biguint_ser")]
     pub cumsum_baseline: Spacetime,

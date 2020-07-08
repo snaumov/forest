@@ -107,7 +107,8 @@ where
         let ps: power::State = self.load_actor_state(&*STORAGE_POWER_ACTOR_ADDR, state_cid)?;
 
         if let Some(claim) = ps.get_claim(self.bs.as_ref(), addr)? {
-            Ok((claim.raw_byte_power, claim.quality_adj_power))
+            //Fix before PR
+            Ok((claim.raw_byte_power.to_biguint().unwrap(), claim.quality_adj_power.to_biguint().unwrap()))
         } else {
             Err(Error::State(
                 "Failed to retrieve claimed power from actor state".to_owned(),

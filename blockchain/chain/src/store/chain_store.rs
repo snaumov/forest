@@ -453,7 +453,8 @@ where
             .get::<PowerState>(&act.state)
             .map_err(|e| e.to_string())?
         {
-            tpow = state.total_quality_adj_power;
+            // Fix before PR
+            tpow = state.total_quality_adj_power.to_biguint().unwrap();
         }
     }
     let log2_p = if tpow > BigUint::zero() {

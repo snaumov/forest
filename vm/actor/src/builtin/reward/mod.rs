@@ -14,7 +14,8 @@ use clock::ChainEpoch;
 use fil_types::StoragePower;
 use ipld_blockstore::BlockStore;
 use num_bigint::biguint_ser::{BigUintDe, BigUintSer};
-use num_bigint::BigUint;
+use num_bigint::bigint_ser::{BigIntDe, BigIntSer};
+use num_bigint::{BigUint, BigInt};
 use num_derive::FromPrimitive;
 use num_traits::{CheckedSub, FromPrimitive};
 use runtime::{ActorCode, Runtime};
@@ -159,7 +160,7 @@ impl Actor {
 
     fn new_baseline_power(_st: &State, _reward_epochs_paid: ChainEpoch) -> StoragePower {
         // TODO: this is not the final baseline function or value, PARAM_FINISH
-        BigUint::from(BASELINE_POWER)
+        BigInt::from(BASELINE_POWER)
     }
 
     // Called at the end of each epoch by the power actor (in turn by its cron hook).
@@ -182,11 +183,15 @@ impl Actor {
             st.realized_power = curr_realized_power;
 
             st.baseline_power = Self::new_baseline_power(st, st.reward_epochs_paid);
-            st.cumsum_baseline += &st.baseline_power;
+
+            //TODO BEFORE PR fix it is unsafe
+            st.cumsum_baseline +=  &st.baseline_power.to_biguint().unwrap();
 
             // Cap realized power in computing CumsumRealized so that progress is only relative to the current epoch.
             let capped_realized_power = std::cmp::min(&st.baseline_power, &st.realized_power);
-            st.cumsum_realized += capped_realized_power;
+            
+            //TODO BEFORE PR fix it is unsafe
+            st.cumsum_realized += capped_realized_power.to_biguint().unwrap();
             st.effective_network_time =
                 st.get_effective_network_time(&st.cumsum_baseline, &st.cumsum_realized);
             Self::compute_per_epoch_reward(st, 1);
@@ -221,7 +226,7 @@ impl ActorCode for Actor {
                 Ok(Serialized::serialize(BigUintSer(&res))?)
             }
             Some(Method::UpdateNetworkKPI) => {
-                let BigUintDe(param) = params.deserialize()?;
+                let BigIntDe(param) = params.deserialize()?;
                 Self::update_network_kpi(rt, param)?;
                 Ok(Serialized::default())
             }

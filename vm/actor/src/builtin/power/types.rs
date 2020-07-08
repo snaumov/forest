@@ -6,7 +6,7 @@ use address::Address;
 use clock::ChainEpoch;
 use encoding::{serde_bytes, tuple::*, Cbor};
 use fil_types::{RegisteredSealProof, SectorSize, StoragePower};
-use num_bigint::biguint_ser;
+use num_bigint::{biguint_ser, bigint_ser};
 use vm::{Serialized, TokenAmount};
 
 pub type SectorTermination = i64;
@@ -117,9 +117,9 @@ pub struct OnFaultEndParams {
 
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct CurrentTotalPowerReturn {
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub raw_byte_power: StoragePower, // TODO: replace with power if it can be computed by miner
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub quality_adj_power: StoragePower,
     #[serde(with = "biguint_ser")]
     pub pledge_collateral: TokenAmount,
@@ -127,8 +127,8 @@ pub struct CurrentTotalPowerReturn {
 
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct UpdateClaimedPowerParams {
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub raw_byte_power: StoragePower, // TODO: replace with power if it can be computed by miner
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub quality_adj_delta: StoragePower,
 }

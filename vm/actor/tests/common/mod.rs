@@ -144,6 +144,8 @@ impl<'a, BS: BlockStore> MockRuntime<'a, BS> {
             .build()
             .unwrap();
 
+    }
+
     #[allow(dead_code)]
     pub fn expect_validate_caller_any(&self) {
         self.expect_validate_caller_any.set(true);

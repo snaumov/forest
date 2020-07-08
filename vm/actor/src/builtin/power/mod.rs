@@ -12,15 +12,16 @@ use crate::reward::Method as RewardMethod;
 use crate::{
     check_empty_params, init,
     init::{ExecParams as InitExecParams, Method as InitMethod},
+    miner::{Method as MinerMethod},
     make_map, request_miner_control_addrs, Multimap, SetMultimap, CALLER_TYPES_SIGNABLE,
-    CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID, REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
+    CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID, REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR, 
 };
 use address::Address;
 use fil_types::{SealVerifyInfo, StoragePower};
 use ipld_blockstore::BlockStore;
 use message::Message;
 use num_bigint::biguint_ser::{BigUintDe, BigUintSer};
-use num_bigint::BigUint;
+use num_bigint::{BigUint, BigInt};
 use num_derive::FromPrimitive;
 use num_traits::{FromPrimitive, Zero};
 use runtime::{ActorCode, Runtime};
@@ -128,6 +129,23 @@ impl Actor {
             robust_address: addresses.robust_address,
         })
     }
+    
+    pub fn update_claimed_power<BS, RT> (rt : &mut RT, params : UpdateClaimedPowerParams) -> Result<(), ActorError>
+    where
+        BS: BlockStore,
+        RT: Runtime<BS>,
+    {
+
+        rt.validate_immediate_caller_type(&[MINER_ACTOR_CODE_ID.clone()])?;
+        let miner_addr = rt.message().from().clone();
+
+        rt.transaction(|st: &mut State, rt| {
+            st.add_to_claim(rt.store(), &miner_addr, &params.raw_byte_power, &params.quality_adj_delta).map_err(|x| ActorError::new(ExitCode::ErrForbidden, x))
+        })?
+    }
+
+
+
     pub fn delete_miner<BS, RT>(rt: &mut RT, params: DeleteMinerParams) -> Result<(), ActorError>
     where
         BS: BlockStore,
@@ -196,7 +214,7 @@ impl Actor {
         let initial_pledge = compute_initial_pledge(rt, &params.weight)?;
 
         rt.transaction(|st: &mut State, rt| {
-            let rb_power = BigUint::from(params.weight.sector_size as u64);
+            let rb_power = BigInt::from(params.weight.sector_size as u64);
             let qa_power = qa_power_for_weight(&params.weight);
             st.add_to_claim(rt.store(), rt.message().from(), &rb_power, &qa_power)
                 .map_err(|e| {
@@ -294,7 +312,7 @@ impl Actor {
             st.add_to_claim(
                 rt.store(),
                 rt.message().from(),
-                &BigUint::from(prev_weight.sector_size as u64),
+                &BigInt::from(prev_weight.sector_size as u64),
                 &prev_power,
             )
             .map_err(|e| {
@@ -308,7 +326,7 @@ impl Actor {
             st.add_to_claim(
                 rt.store(),
                 rt.message().from(),
-                &BigUint::from(new_weight.sector_size as u64),
+                &BigInt::from(new_weight.sector_size as u64),
                 &new_power,
             )
             .map_err(|e| {
@@ -344,6 +362,83 @@ impl Actor {
                     )
                 })
         })?
+    }
+
+
+    #[allow(dead_code)]
+    fn process_deferred_cron_events<BS, RT>(rt : &mut RT)-> Result<(), ActorError>
+    where
+    BS : BlockStore,
+    RT : Runtime<BS>,{
+        let rt_epoch = rt.curr_epoch();
+        let cron_events = rt
+            .transaction::<_, Result<_, String>, _>(|st: &mut State, rt| {
+                let mut events = Vec::new();
+                for i in st.last_epoch_tick..=rt_epoch {
+                    // Load epoch cron events
+                    let epoch_events = st.load_cron_events(rt.store(), i)?;
+
+                    // Add all events to vector
+                    events.extend_from_slice(&epoch_events);
+
+                    // Clear loaded events
+                    if !epoch_events.is_empty() {
+                        st.clear_cron_events(rt.store(), i)?;
+                    }
+                }
+                st.last_epoch_tick = rt_epoch;
+                Ok(events)
+            })?
+            .map_err(|e| {
+                ActorError::new(
+                    ExitCode::ErrIllegalState,
+                    format!("Failed to clear cron events: {}", e),
+                )
+            })?;
+
+        let mut failed_miner_crons: Vec<Address> = Vec::new();
+        for event in cron_events{
+            if let Err(_) =  rt.send(
+                &event.miner_addr,
+                MinerMethod::OnDeferredCronEvent as u64 ,
+                &event.callback_payload,
+                &TokenAmount::default()
+            ){
+                failed_miner_crons.extend_from_slice(&[event.miner_addr]);
+                // If a callback fails, this actor continues to invoke other callbacks
+                // and persists state removing the failed event from the event queue. It won't be tried again.
+                // Failures are unexpected here but will result in removal of miner power
+                // A log message would really help here.
+                println!("Replace with another statenemtn");
+            }
+        }
+
+        rt.transaction::<_, Result<_, ActorError>, _>(|st: &mut State, rt|{
+
+            let store = rt.store();
+            for miner_addr in failed_miner_crons{
+                let ret = st.get_claim(store, &miner_addr);
+
+                if ret.is_err(){
+                    println!("Failed to get claim for miner afte rfailing OnDefferedCronEvent");
+                }
+                else if ret.unwrap().is_none(){
+                    println!("Miner OnDefferedCronEvent failed for miner");
+                }
+
+                else{
+                    let claim = ret.unwrap().unwrap();
+                    let g = claim.raw_byte_power.to_owned();
+                if st.add_to_claim(store, &miner_addr,  g * -1, claim.quality_adj_power.to_owned() * -1).is_err(){
+                    println!("Failed to remove");
+                }
+                }
+                //zero out miner
+            }
+            Ok(())
+        });
+        Ok(())
+
     }
 
     pub fn on_epoch_tick_end<BS, RT>(rt: &mut RT) -> Result<(), ActorError>
@@ -548,11 +643,11 @@ where
 
 fn powers_for_weights(weights: Vec<SectorStorageWeightDesc>) -> (StoragePower, StoragePower) {
     // returns (rbpower, qapower)
-    let mut rb_power = BigUint::zero();
-    let mut qa_power = BigUint::zero();
+    let mut rb_power = BigInt::zero();
+    let mut qa_power = BigInt::zero();
 
     for w in &weights {
-        rb_power += BigUint::from(w.sector_size as u64);
+        rb_power += BigInt::from(w.sector_size as u64);
         qa_power += qa_power_for_weight(&w);
     }
 
@@ -631,6 +726,12 @@ impl ActorCode for Actor {
             Some(Method::CurrentTotalPower) => {
                 let v = Self::current_total_power(rt)?;
                 Ok(Serialized::serialize(v)?)
+            }
+
+            Some(Method::UpdateClaimedPower) =>{
+                Self::update_claimed_power(rt , params.deserialize()?)?;
+                Ok(Serialized::default())
+                //let v = Self::
             }
             _ => Err(rt.abort(ExitCode::SysErrInvalidMethod, "Invalid method")),
         }

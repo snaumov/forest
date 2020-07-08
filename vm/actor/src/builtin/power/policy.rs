@@ -3,7 +3,7 @@
 
 use super::SectorStorageWeightDesc;
 use fil_types::{SectorQuality, StoragePower};
-use num_bigint::BigUint;
+use num_bigint::{BigUint, BigInt};
 use num_traits::FromPrimitive;
 use vm::TokenAmount;
 
@@ -43,7 +43,7 @@ fn sector_quality_from_weight(weight: &SectorStorageWeightDesc) -> SectorQuality
 pub fn qa_power_for_weight(weight: &SectorStorageWeightDesc) -> StoragePower {
     let qual = sector_quality_from_weight(weight);
     let sector_quality = BigUint::from(weight.sector_size as u64) * qual;
-    sector_quality >> SECTOR_QUALITY_PRECISION
+    StoragePower::from_biguint( num_bigint::Sign::Plus, sector_quality >> SECTOR_QUALITY_PRECISION)
 }
 
 pub fn initial_pledge_for_weight(
@@ -58,5 +58,5 @@ pub fn initial_pledge_for_weight(
     let _ = circ_supply; // TODO: ce use this
     let _ = total_pledge; // TODO: ce use this
 
-    (qa_power * per_epoch_reward) / tot_qa_power
+    (qa_power.to_biguint().unwrap() * per_epoch_reward) / tot_qa_power.to_biguint().unwrap()
 }

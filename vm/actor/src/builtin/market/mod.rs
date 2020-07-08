@@ -24,7 +24,7 @@ use fil_types::PieceInfo;
 use ipld_amt::Amt;
 use ipld_blockstore::BlockStore;
 use message::Message;
-use num_bigint::BigUint;
+use num_bigint::{BigUint, BigInt};
 use num_derive::FromPrimitive;
 use num_traits::{FromPrimitive, Zero};
 use runtime::{ActorCode, Runtime};
@@ -208,7 +208,7 @@ impl Actor {
             if deal.proposal.verified_deal {
                 let ser_params = Serialized::serialize(&BytesParams {
                     address: deal.proposal.client,
-                    deal_size: BigUint::from(deal.proposal.piece_size.0),
+                    deal_size: BigInt::from(deal.proposal.piece_size.0),
                 })?;
                 rt.send(
                     &*VERIFIED_REGISTRY_ACTOR_ADDR,
@@ -613,7 +613,7 @@ impl Actor {
         for d in timed_out_verified_deals {
             let ser_params = Serialized::serialize(BytesParams {
                 address: d.client,
-                deal_size: BigUint::from(d.piece_size.0),
+                deal_size: BigInt::from(d.piece_size.0 ),
             })?;
             rt.send(
                 &*VERIFIED_REGISTRY_ACTOR_ADDR,
