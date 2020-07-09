@@ -88,7 +88,6 @@ impl Actor {
 
         let tx_id = rt.transaction::<State, _, _>(|st, rt| {
             Self::validate_signer(rt, &st, &caller_addr)?;
-
             let t_id = st.next_tx_id;
             st.next_tx_id.0 += 1;
 
@@ -233,20 +232,20 @@ impl Actor {
             if !st.is_signer(&params.signer) {
                 return Err(ActorError::new(
                     ExitCode::ErrNotFound,
-                    "Party not found".to_owned(),
+                    "Party not found".to_string(),
                 ));
             }
             if st.signers.len() == 1 {
                 return Err(ActorError::new(
                     ExitCode::ErrForbidden,
-                    "Cannot remove only signer".to_owned(),
+                    "Cannot remove only signer".to_string(),
                 ));
             }
 
             if !params.decrease && st.signers.len() < (st.num_approvals_threshold + 1) as usize {
                 return Err(ActorError::new(
                     ExitCode::ErrIllegalArgument,
-                    "Cant reduce signers to below threshold with decrease set to false".to_owned(),
+                    "Cant reduce signers to below threshold with decrease set to false".to_string(),
                 ));
             }
 
@@ -352,7 +351,7 @@ impl Actor {
                 if previous_approver == &from {
                     return Err(ActorError::new(
                         ExitCode::ErrIllegalState,
-                        "Already approved this message".to_owned(),
+                        "Already approved this message".to_string(),
                     ));
                 }
             }
@@ -362,14 +361,14 @@ impl Actor {
                 if result_hash.is_err() {
                     return Err(ActorError::new(
                         ExitCode::ErrIllegalState,
-                        "Failed to compute proposal hash".to_owned(),
+                        "Failed to compute proposal hash".to_string(),
                     ));
                 }
 
                 if !proposal_hash.eq(&result_hash.unwrap()) {
                     return Err(ActorError::new(
                         ExitCode::ErrIllegalState,
-                        "Hash does  not match proposal params".to_owned(),
+                        "Hash does  not match proposal params".to_string(),
                     ));
                 }
             }
