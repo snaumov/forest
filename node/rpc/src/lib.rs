@@ -1,6 +1,7 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+mod blockstore_api;
 mod chain_api;
 
 use blockstore::BlockStore;
@@ -9,7 +10,10 @@ use std::sync::Arc;
 use tide::{Request, Response, StatusCode};
 
 /// This is where you store persistant data, or at least access to stateful data.
-pub struct State<DB: BlockStore + Send + Sync + 'static> {
+pub struct State<DB: BlockStore + Send + Sync + 'static>
+where
+    DB: BlockStore + Send + Sync + 'static,
+{
     pub store: Arc<DB>,
 }
 
@@ -19,7 +23,10 @@ async fn handle_json_rpc(mut req: Request<Server<MapRouter>>) -> tide::Result {
     Ok(Response::new(StatusCode::Ok).body_json(&res)?)
 }
 
-pub async fn start_rpc<DB: BlockStore + Send + Sync + 'static>(store: Arc<DB>, rpc_endpoint: &str) {
+pub async fn start_rpc<DB>(store: Arc<DB>, rpc_endpoint: &str)
+where
+    DB: BlockStore + Send + Sync + 'static,
+{
     let rpc = Server::new()
         .with_data(Data::new(State { store }))
         .with_method(
@@ -51,6 +58,7 @@ pub async fn start_rpc<DB: BlockStore + Send + Sync + 'static>(store: Arc<DB>, r
         )
         .with_method("Filecoin.ChainGetBlock", chain_api::chain_get_block::<DB>)
         .with_method("Filecoin.ChainHead", chain_api::chain_head::<DB>)
+        .with_method("Filecoin.Get", blockstore_api::get::<DB>)
         .finish_unwrapped();
     let mut app = tide::Server::with_state(rpc);
     app.at("/api").post(handle_json_rpc);
