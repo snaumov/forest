@@ -12,8 +12,8 @@ use common::*;
 use db::MemoryDB;
 use ipld_blockstore::BlockStore;
 use message::UnsignedMessage;
-use std::panic;
 use runtime::Syscalls;
+use std::panic;
 use vm::{ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR};
 
 fn construct_runtime<'a, BS: BlockStore>(bs: &'a BS) -> MockRuntime<'a, BS> {

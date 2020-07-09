@@ -19,15 +19,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::error::Error as StdError;
 use vm::{ActorError, ExitCode, MethodNum, Randomness, Serialized, TokenAmount};
-//use interpreter::gas_syscalls::GasSyscalls;
-use fil_types::{
-    PieceInfo, RegisteredProof, SealVerifyInfo,
-    WindowPoStVerifyInfo,
-};
-
-use runtime::{ConsensusFault};
-use std::error::Error as StdError;
-
 
 pub struct MockRuntime<'a, BS: BlockStore> {
     pub epoch: ChainEpoch,
@@ -165,25 +156,6 @@ where
     pub fn expect_validate_caller_addr(&self, addr: &[Address]) {
         assert!(addr.len() > 0, "addrs must be non-empty");
         *self.expect_validate_caller_addr.borrow_mut() = Some(addr.to_vec());
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_validate_caller_type(&self, ids: &[Cid]) {
-        assert!(ids.len() > 0, "addrs must be non-empty");
-        *self.expect_validate_caller_type.borrow_mut() = Some(ids.to_vec());
-    }
-
-    pub fn expect_verify_signature(
-        &mut self,
-        sig: Signature,
-        signer: Address,
-        result: Option<String>,
-    ) {
-        self.expect_verify_sig = Some(ExpectedVerifySig {
-            sig: sig,
-            signer: signer,
-            result: result,
-        });
     }
 
     #[allow(dead_code)]

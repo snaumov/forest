@@ -21,7 +21,7 @@ use derive_builder::Builder;
 use encoding::to_vec;
 use ipld_blockstore::BlockStore;
 use message::UnsignedMessage;
-use num_bigint::{BigInt, Sign};
+use num_bigint::BigInt;
 use vm::{ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR, METHOD_SEND};
 
 const R_PAYEE_ADDR: u64 = 103;
@@ -207,7 +207,7 @@ mod create_lane_tests {
         }
     }
 
-    //#[test]
+    #[test]
     fn create_lane_test() {
         let init_actor_addr = Address::new_id(TEST_INIT_ACTOR_ADDR);
         let paych_addr = Address::new_id(PAYCH_ADDR);
@@ -1113,26 +1113,6 @@ fn verify_state<BS: BlockStore>(
     assert_eq!(expected_state.min_settle_height, state.min_settle_height);
     assert_eq!(expected_state.settling_at, state.settling_at);
     assert_eq!(expected_state.to_send, state.to_send);
-    if exp_lanes > 0 {
-        assert_eq!(exp_lanes as u64, state.lane_states.len() as u64);
-        assert_eq!(expected_state.lane_states, state.lane_states);
-    } else {
-        assert_eq!(state.lane_states.len(), 0);
-    }
-}
-
-fn verify_state<BS: BlockStore>(
-    rt: &mut MockRuntime<'_, BS>,
-    exp_lanes: i64,
-    expected_state: PState,
-) {
-    let state: PState = rt.get_state().unwrap();
-    assert_eq!(expected_state.to, state.to);
-    assert_eq!(expected_state.from, state.from);
-    assert_eq!(expected_state.min_settle_height, state.min_settle_height);
-    assert_eq!(expected_state.settling_at, state.settling_at);
-    assert_eq!(expected_state.to_send, state.to_send);
-
     if exp_lanes > 0 {
         assert_eq!(exp_lanes as u64, state.lane_states.len() as u64);
         assert_eq!(expected_state.lane_states, state.lane_states);
