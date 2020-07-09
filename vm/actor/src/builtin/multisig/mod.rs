@@ -357,15 +357,14 @@ impl Actor {
             }
 
             if check_hash {
-                let result_hash = Self::compute_proposal_hash(rt, txn.clone());
-                if result_hash.is_err() {
-                    return Err(ActorError::new(
+                let result_hash = Self::compute_proposal_hash(rt, txn.clone()).map_err(|_| {
+                    ActorError::new(
                         ExitCode::ErrIllegalState,
                         "Failed to compute proposal hash".to_string(),
-                    ));
-                }
+                    )
+                })?;
 
-                if !proposal_hash.eq(&result_hash.unwrap()) {
+                if proposal_hash != result_hash {
                     return Err(ActorError::new(
                         ExitCode::ErrIllegalState,
                         "Hash does  not match proposal params".to_string(),
