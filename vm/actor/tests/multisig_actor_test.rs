@@ -111,11 +111,13 @@ fn add_signer<'a, BS: BlockStore>(
         signer: signer,
         increase: increase,
     };
-    rt.call(
+    let v = rt.call(
         &*MULTISIG_ACTOR_CODE_ID,
         Method::AddSigner as u64,
         &Serialized::serialize(&params).unwrap(),
-    )
+    );
+    rt.verify();
+    v
 }
 
 fn remove_signer<'a, BS: BlockStore>(
@@ -127,11 +129,13 @@ fn remove_signer<'a, BS: BlockStore>(
         signer: signer,
         decrease: decrease,
     };
-    rt.call(
+    let v = rt.call(
         &*MULTISIG_ACTOR_CODE_ID,
         Method::RemoveSigner as u64,
         &Serialized::serialize(&params).unwrap(),
-    )
+    );
+    rt.verify();
+    v
 }
 fn swap_signers<'a, BS: BlockStore>(
     rt: &mut MockRuntime<'a, BS>,
@@ -212,7 +216,6 @@ mod construction_tests {
         let mut rt = MockRuntime::new(bs, message);
         rt.set_caller(INIT_ACTOR_CODE_ID.clone(), INIT_ACTOR_ADDR.clone());
         rt.expect_validate_caller_addr(&[*INIT_ACTOR_ADDR]);
-
         return rt;
     }
 
@@ -230,7 +233,11 @@ mod construction_tests {
         rt.verify();
         let state: State = rt.get_state().unwrap();
         assert_eq!(params.signers, state.signers);
-        assert_eq!(params.signers, state.signers);
+        assert_eq!(
+            params.num_approvals_threshold,
+            state.num_approvals_threshold
+        );
+        assert_eq!(TokenAmount::from(0u8), state.initial_balance);
         assert_eq!(
             params.num_approvals_threshold,
             state.num_approvals_threshold
@@ -253,7 +260,6 @@ mod construction_tests {
         };
         let state = check_construct_state(&mut rt, params);
 
-        assert_eq!(TokenAmount::from(0u8), state.initial_balance);
         assert_eq!(0, state.unlock_duration);
         assert_eq!(0, state.start_epoch);
         let txns = Set::from_root(rt.store, &state.pending_txs)
@@ -293,6 +299,33 @@ mod construction_tests {
             signers: vec![],
             num_approvals_threshold: 1,
             unlock_duration: 1,
+        };
+        assert_eq!(
+            ExitCode::ErrIllegalArgument,
+            rt.call(
+                &*MULTISIG_ACTOR_CODE_ID,
+                Method::Constructor as u64,
+                &Serialized::serialize(&params).unwrap(),
+            )
+            .unwrap_err()
+            .exit_code()
+        );
+        rt.verify();
+    }
+
+    // fail to construct multisig with duplicate signers(all ID addresses
+    #[test]
+    fn fail_multi_duplicate() {
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let params = ConstructorParams {
+            signers: vec![
+                Address::new_id(ANNE),
+                Address::new_id(BOB),
+                Address::new_id(BOB),
+            ],
+            num_approvals_threshold: 2,
+            unlock_duration: 0,
         };
         assert_eq!(
             ExitCode::ErrIllegalArgument,
@@ -687,7 +720,7 @@ mod test_approve {
     }
 
     #[test]
-    fn fail_with_bad_proposal() {
+    fn fail_with_bad_proposal_hash() {
         let bs = MemoryDB::default();
         let mut rt = construct_and_propose(&bs, METHOD_SEND);
         let fake_params = Serialized::serialize([1, 2, 3, 4]).unwrap();

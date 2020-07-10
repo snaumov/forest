@@ -13,6 +13,7 @@ use message::Message;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use runtime::{ActorCode, Runtime};
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use vm::{ActorError, ExitCode, MethodNum, Serialized, TokenAmount, METHOD_CONSTRUCTOR};
 
@@ -48,6 +49,16 @@ impl Actor {
                 ExitCode::ErrIllegalArgument,
                 "Must have at least one signer".to_owned(),
             ));
+        }
+
+        let mut addr_map: HashMap<Address, ()> = HashMap::new();
+        for signer in &params.signers {
+            if addr_map.insert(*signer, ()).is_some() {
+                return Err(rt.abort(
+                    ExitCode::ErrIllegalArgument,
+                    "Duplicates signers not allowed".to_string(),
+                ));
+            }
         }
 
         let empty_root = make_map(rt.store()).flush().map_err(|err| {
@@ -381,13 +392,10 @@ impl Actor {
                     format!("Failed to put transaction for approval: {}", e),
                 ));
             }
-
-            // Check if number approvals is met
-
-            // Number of approvals required not met, do not relay message
             Ok((txn, false))
         })??;
         let st: State = rt.state().unwrap();
+
         // Sufficient number of approvals have arrived, relay message
         if tx.approved.len() >= st.num_approvals_threshold as usize {
             // Ensure sufficient funds
