@@ -417,22 +417,22 @@ impl Actor {
 
             let store = rt.store();
             for miner_addr in failed_miner_crons{
-                let ret = st.get_claim(store, &miner_addr);
+                // let ret = st.get_claim(store, &miner_addr);
 
-                if ret.is_err(){
-                    println!("Failed to get claim for miner afte rfailing OnDefferedCronEvent");
-                }
-                else if ret.unwrap().is_none(){
-                    println!("Miner OnDefferedCronEvent failed for miner");
-                }
+                // if ret.is_err(){
+                //     println!("Failed to get claim for miner afte rfailing OnDefferedCronEvent");
+                // }
+                // else if ret.unwrap().is_none(){
+                //     println!("Miner OnDefferedCronEvent failed for miner");
+                // }
 
-                else{
-                    let claim = ret.unwrap().unwrap();
-                    let g = claim.raw_byte_power.to_owned();
-                if st.add_to_claim(store, &miner_addr,  g * -1, claim.quality_adj_power.to_owned() * -1).is_err(){
-                    println!("Failed to remove");
-                }
-                }
+                // else{
+                //     let claim = ret.unwrap().unwrap();
+                //     let g = claim.raw_byte_power.to_owned();
+                // // if st.add_to_claim(store, &miner_addr,  g * -1, claim.quality_adj_power.to_owned() * -1).is_err(){
+                // //     println!("Failed to remove");
+                // // }
+                // }
             }
             Ok(())
         });
