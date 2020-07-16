@@ -8,7 +8,6 @@ use cid::Cid;
 use encoding::{tuple::*, Cbor};
 use ipld_blockstore::BlockStore;
 use ipld_hamt::{BytesKey, Hamt};
-use num_bigint::biguint_ser::{BigUintDe, BigUintSer};
 use num_bigint::bigint_ser::{BigIntDe, BigIntSer};
 
 use crate::builtin::verifreg::types::Datacap;

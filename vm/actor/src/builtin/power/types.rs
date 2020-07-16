@@ -6,7 +6,8 @@ use address::Address;
 use clock::ChainEpoch;
 use encoding::{serde_bytes, tuple::*, Cbor};
 use fil_types::{RegisteredSealProof, SectorSize, StoragePower};
-use num_bigint::{biguint_ser, bigint_ser};
+use num_bigint::bigint_ser;
+use num_bigint::biguint_ser;
 use vm::{Serialized, TokenAmount};
 
 pub type SectorTermination = i64;
@@ -69,7 +70,7 @@ pub struct OnSectorTerminateParams {
 pub struct OnSectorTemporaryFaultEffectiveBeginParams {
     // TODO revisit todo for replacing with power
     pub weights: Vec<SectorStorageWeightDesc>,
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub pledge: TokenAmount,
 }
 
@@ -77,7 +78,7 @@ pub struct OnSectorTemporaryFaultEffectiveBeginParams {
 pub struct OnSectorTemporaryFaultEffectiveEndParams {
     // TODO revisit todo for replacing with power
     pub weights: Vec<SectorStorageWeightDesc>,
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub pledge: TokenAmount,
 }
 
@@ -121,7 +122,7 @@ pub struct CurrentTotalPowerReturn {
     pub raw_byte_power: StoragePower, // TODO: replace with power if it can be computed by miner
     #[serde(with = "bigint_ser")]
     pub quality_adj_power: StoragePower,
-    #[serde(with = "biguint_ser")]
+    #[serde(with = "bigint_ser")]
     pub pledge_collateral: TokenAmount,
 }
 

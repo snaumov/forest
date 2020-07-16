@@ -1,6 +1,8 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use num_bigint::BigInt;
+mod errors;
+mod msgpool;
 
-pub type TokenAmount = BigInt;
+pub use self::errors::*;
+pub use self::msgpool::*;

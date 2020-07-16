@@ -4,7 +4,7 @@
 use address::Address;
 use encoding::tuple::*;
 use fil_types::StoragePower;
-use num_bigint::{biguint_ser, bigint_ser};
+use num_bigint::bigint_ser;
 use num_traits::FromPrimitive;
 
 lazy_static! {
