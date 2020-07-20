@@ -70,9 +70,9 @@ impl State {
             .get_claim(store, miner)?
             .ok_or(format!("no claim for actor {}", miner))?;
 
-        let new_claim = Claim{
-            raw_byte_power : &old_claim.raw_byte_power + power,
-            quality_adj_power : &old_claim.quality_adj_power + qa_power,
+        let new_claim = Claim {
+            raw_byte_power: &old_claim.raw_byte_power + power,
+            quality_adj_power: &old_claim.quality_adj_power + qa_power,
         };
 
         //Update commited

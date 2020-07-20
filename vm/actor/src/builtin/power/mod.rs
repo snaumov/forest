@@ -512,24 +512,31 @@ impl Actor {
         rt.validate_immediate_caller_type(std::iter::once(&*MINER_ACTOR_CODE_ID))?;
         let miner_addr = *rt.message().from();
 
-        rt.transaction::<State, Result<(), ActorError>, _>( |st: &mut State, rt : &mut RT|  {
-            let claim: Claim = st.get_claim(rt.store(), &miner_addr)
-
-            .map_err(|e| {
+        rt.transaction::<State, Result<(), ActorError>, _>(|st: &mut State, rt: &mut RT| {
+            let claim: Claim = st
+                .get_claim(rt.store(), &miner_addr)
+                .map_err(|e| {
                     ActorError::new(
                         ExitCode::ErrIllegalState,
                         format!("failed to read claimed power for fault: {}", e),
                     )
                 })?
-            .ok_or_else(|| {
-                ActorError::new(
-                    ExitCode::ErrIllegalArgument,
-                    format!("miner {} not registered (already slashed?)", miner_addr),
-                )
-            })?;
+                .ok_or_else(|| {
+                    ActorError::new(
+                        ExitCode::ErrIllegalArgument,
+                        format!("miner {} not registered (already slashed?)", miner_addr),
+                    )
+                })?;
 
-            assert!(st.add_to_claim(rt.store(), &miner_addr,  &claim.quality_adj_power , &claim.raw_byte_power).is_ok());
-             
+            assert!(st
+                .add_to_claim(
+                    rt.store(),
+                    &miner_addr,
+                    &claim.quality_adj_power,
+                    &claim.raw_byte_power
+                )
+                .is_ok());
+
             st.add_pledge_total(pledge_amount);
             Ok(())
         })??;
