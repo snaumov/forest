@@ -4,7 +4,7 @@
 mod common;
 
 use actor::{
-    init::{ExecParams,  Method as INIT_METHOD},
+    init::{ExecParams, Method as INIT_METHOD},
     miner::Method as MinerMethod,
     power::{
         Claim, CreateMinerParams, CreateMinerReturn, CurrentTotalPowerReturn,
@@ -35,7 +35,7 @@ use ipld_blockstore::BlockStore;
 use ipld_hamt::BytesKey;
 use ipld_hamt::Hamt;
 use message::UnsignedMessage;
-use num_bigint::{BigInt, BigUint, bigint_ser::BigIntSer, biguint_ser::BigUintSer};
+use num_bigint::{bigint_ser::BigIntSer, biguint_ser::BigUintSer, BigInt, BigUint};
 // use serde::Serialize;
 use vm::{ActorError, ExitCode, Serialized, TokenAmount, METHOD_CONSTRUCTOR, METHOD_SEND};
 
@@ -227,7 +227,13 @@ fn update_pledge_total<BS: BlockStore>(
 
     // Not sure why i cant serialize when it already exists. need to double check
     let params = &Serialized::serialize(BigIntSer(&delta)).unwrap();
-    assert!(rt.call(&*POWER_ACTOR_CODE_ID, Method::UpdatePledgeTotal as u64, params ).is_ok());
+    assert!(rt
+        .call(
+            &*POWER_ACTOR_CODE_ID,
+            Method::UpdatePledgeTotal as u64,
+            params
+        )
+        .is_ok());
     rt.verify();
 }
 
@@ -269,6 +275,34 @@ fn construct_runtime<BS: BlockStore>(bs: &BS) -> MockRuntime<'_, BS> {
     return rt;
 }
 
+fn expect_total_power_eager<BS: BlockStore>(
+    rt: &MockRuntime<BS>,
+    expected_raw: StoragePower,
+    expected_qa: StoragePower,
+) {
+    let state: State = rt.get_state().unwrap();
+    let (raw_power, qa_power) = state.current_total_power();
+    assert_eq!(expected_raw, raw_power);
+    assert_eq!(expected_qa, qa_power);
+}
+fn expect_total_pledge_eager<BS: BlockStore>(rt: &MockRuntime<BS>, expected_pledge: TokenAmount) {
+    let state: State = rt.get_state().unwrap();
+    assert_eq!(expected_pledge, state.total_pledge_collateral);
+}
+
+fn on_consensus_fault<BS: BlockStore>(
+    rt: &mut MockRuntime<BS>,
+    miner : Address,
+    pledge_amt : TokenAmount){
+        rt.expect_validate_caller_type(&[MINER_ACTOR_CODE_ID.clone()]);
+        rt.set_caller(MINER_ACTOR_CODE_ID.clone(), miner.clone());
+        assert!(rt.call(&*POWER_ACTOR_CODE_ID,  Method::OnConsensusFault as u64  , &Serialized::serialize(&BigIntSer(&pledge_amt)).unwrap()).is_ok() ) ;
+        rt.verify();
+        let state : State = rt.get_state().unwrap();
+
+        assert!(state.get_claim(rt.store, &miner).unwrap().is_none());
+    }
+
 mod test_construction {
     use super::*;
     const OWNER: u64 = 101;
@@ -309,7 +343,7 @@ mod test_construction {
         assert_eq!(StoragePower::from(0u8), state.total_raw_byte_power);
         assert_eq!(0, state.num_miners_meeting_min_power);
 
-        //let claim_map = Set::from_root(rt.store, &state.claims).unwrap();
+        //let claim_map: Hamt<Claim, MemoryDB> = Hamt::load(&state.claims, rt.store).unwrap();
         // let keys = claim_map.collect_keys().unwrap();
         // assert_eq!(1, keys.len());
 
@@ -329,15 +363,18 @@ mod power_and_pledge {
     const OWNER: u64 = 101;
     const MINER_1: u64 = 111;
     const MINER_2: u64 = 112;
+    const MINER_3: u64 = 113;
+    const MINER_4: u64 = 114;
+    const MINER_5: u64 = 115;
 
-    //#[test]
+    #[test]
     fn power_and_pledge_accounted() {
         let bs = MemoryDB::default();
         let mut rt = construct_runtime(&bs);
         let owner = Address::new_id(OWNER);
         let miner1 = Address::new_id(MINER_1);
         let miner2 = Address::new_id(MINER_2);
-        let power_unit = CONSENSUS_MINER_MIN_POWER.clone();
+        let small_power_unit = StoragePower::from(1_000_000u64);
 
         let mut miner_seq = 0;
         create_miner_basic(
@@ -364,56 +401,236 @@ mod power_and_pledge {
         update_claimed_power(
             &mut rt,
             miner1.clone(),
-            power_unit.clone(),
-            power_unit.clone() * 2 as u64,
+            small_power_unit.clone(),
+            small_power_unit.clone() * 2 as u64,
         );
-        let cp = current_power_total(&mut rt);
-        assert_eq!(power_unit, cp.raw_byte_power);
-        assert_eq!(&power_unit * 2 as u64, cp.quality_adj_power);
+        expect_total_power_eager(&rt, small_power_unit.clone(), &small_power_unit * 2);
         assert_eq!(BigInt::from(0u8), cp.pledge_collateral);
 
         update_claimed_power(
             &mut rt,
             miner2.clone(),
-            power_unit.clone(),
-            power_unit.clone() * 2 as u64,
+            small_power_unit.clone(),
+            small_power_unit.clone(),
         );
-        update_pledge_total(&mut rt, miner1.clone(), TokenAmount::from(1000000u64));
+        update_pledge_total(&mut rt, miner1.clone(), TokenAmount::from(1_000_000u64));
+        expect_total_power_eager(&rt, &small_power_unit * 2, &small_power_unit * 3);
+        expect_total_pledge_eager(&rt, TokenAmount::from(1_000_000u64));
 
-        let cp = current_power_total(&mut rt);
-        assert_eq!(&power_unit * 2 as u64, cp.raw_byte_power);
-        assert_eq!(&power_unit * 3 as u64, cp.quality_adj_power);
-        assert_eq!(BigInt::from(1000000u64), cp.pledge_collateral);
         rt.verify();
 
         let state: State = rt.get_state().unwrap();
         let claim1 = state.get_claim(rt.store, &miner1).unwrap().unwrap();
-        assert_eq!(power_unit, claim1.raw_byte_power);
-        assert_eq!(&power_unit * 2 as u64, claim1.quality_adj_power);
+        assert_eq!(small_power_unit, claim1.raw_byte_power);
+        assert_eq!(&small_power_unit * 2 as u64, claim1.quality_adj_power);
 
         let claim2 = state.get_claim(rt.store, &miner2).unwrap().unwrap();
-        assert_eq!(power_unit.clone(), claim2.raw_byte_power);
-        assert_eq!(power_unit, claim2.quality_adj_power);
+        assert_eq!(small_power_unit.clone(), claim2.raw_byte_power);
+        assert_eq!(small_power_unit, claim2.quality_adj_power);
 
         // Subtract power and some pledge for miner2
         // has to be negative power_unit instea dof positive. need to chnage the type
         update_claimed_power(
             &mut rt,
             miner2.clone(),
+            small_power_unit.clone() * -1,
+            small_power_unit.clone() * -1,
+        );
+
+        update_pledge_total(&mut rt, miner2.clone(), TokenAmount::from(100_000u64) * -1);
+
+        expect_total_power_eager(&rt, &small_power_unit * 1, &small_power_unit * 2);
+        expect_total_pledge_eager(&rt, TokenAmount::from(900_000u64));
+
+        let state: State = rt.get_state().unwrap();
+        let claim2 = state.get_claim(rt.store, &miner2).unwrap().unwrap();
+        assert_eq!(StoragePower::from(0u8), claim2.raw_byte_power);
+        assert_eq!(StoragePower::from(0u8), claim2.quality_adj_power);
+    }
+
+    #[test]
+    fn power_accounting_crossing_thresh() {
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let owner = Address::new_id(OWNER);
+        let mut miner_seq = 0;
+        let power_unit = CONSENSUS_MINER_MIN_POWER.clone();
+        let small_power_unit = StoragePower::from(1_000_000u64);
+
+        for miner in &[MINER_1, MINER_2, MINER_3, MINER_4, MINER_5] {
+            let miner_addr = Address::new_id(*miner);
+            create_miner_basic(
+                &mut rt,
+                &mut miner_seq,
+                owner.clone(),
+                owner.clone(),
+                miner_addr.clone(),
+            );
+        }
+        for miner in &[MINER_1, MINER_2, MINER_3] {
+            let miner_addr = Address::new_id(*miner);
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                small_power_unit.clone() / 2,
+                small_power_unit.clone(),
+            );
+        }
+
+        for miner in &[MINER_4, MINER_5] {
+            let miner_addr = Address::new_id(*miner);
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                power_unit.clone() / 2,
+                power_unit.clone(),
+            );
+        }
+
+        let expected_total_below: TokenAmount = &small_power_unit * 3 + &power_unit * 2;
+        expect_total_power_eager(&rt, &expected_total_below / 2, expected_total_below.clone());
+
+        let delta = &power_unit - &small_power_unit;
+
+        update_claimed_power(&mut rt, Address::new_id(MINER_3), &delta / 2, delta.clone());
+
+        let expected_total_above = power_unit * 3;
+        expect_total_power_eager(&rt, &expected_total_above / 2, expected_total_above);
+
+        let state: State = rt.get_state().unwrap();
+        assert_eq!(3, state.num_miners_meeting_min_power);
+
+        update_claimed_power(&mut rt, Address::new_id(MINER_3), &delta / -2, delta * -1);
+
+        expect_total_power_eager(&rt, &expected_total_below / 2, expected_total_below);
+    }
+
+    #[test]
+    fn all_power_dissapears(){
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let owner = Address::new_id(OWNER);
+        let mut miner_seq = 0;
+        let power_unit = CONSENSUS_MINER_MIN_POWER.clone();
+        let small_power_unit = StoragePower::from(1_000_000u64);
+
+        for miner in &[MINER_1, MINER_2, MINER_3, MINER_4] {
+            let miner_addr = Address::new_id(*miner);
+            create_miner_basic(
+                &mut rt,
+                &mut miner_seq,
+                owner.clone(),
+                owner.clone(),
+                miner_addr.clone(),
+            );
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                power_unit.clone() ,
+                power_unit.clone(),
+            );
+        }
+
+        let exp_total = StoragePower::from( power_unit.clone() * 4);
+        expect_total_power_eager(&rt, exp_total.clone(), exp_total.clone());
+
+        update_claimed_power(
+            &mut rt,
+            Address::new_id(MINER_4),
             power_unit.clone() * -1 ,
             power_unit.clone() * -1,
         );
+        let exp_total = StoragePower::from( power_unit.clone() * 3);
+        expect_total_power_eager(&rt, exp_total.clone(), exp_total.clone());
+    }
 
-        // update_pledge_total(&mut rt, miner2.clone(), TokenAmount::from(100000u64)* -1);
-        // let cp = current_power_total(&mut rt);
-        // assert_eq!(&power_unit * 1 as u64, cp.raw_byte_power);
-        // assert_eq!(&power_unit * 2 as u64, cp.quality_adj_power);
-        // assert_eq!(BigUint::from(1000000u64), cp.pledge_collateral);
+    #[test]
+    pub fn thresh_qa_not_raw(){
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let owner = Address::new_id(OWNER);
+        let mut miner_seq = 0;
+        let power_unit = CONSENSUS_MINER_MIN_POWER.clone();
+        
+        for miner in &[MINER_1, MINER_2, MINER_3] {
+            let miner_addr = Address::new_id(*miner);
+            create_miner_basic(
+                &mut rt,
+                &mut miner_seq,
+                owner.clone(),
+                owner.clone(),
+                miner_addr.clone(),
+            );
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                power_unit.clone() ,
+                StoragePower::default(),
+            );
+        }
 
-        // let state: State = rt.get_state().unwrap();
-        // let claim2 = state.get_claim(rt.store, &miner2).unwrap().unwrap();
-        // assert_eq!(StoragePower::from(0u8), claim2.raw_byte_power);
-        // assert_eq!(StoragePower::from(0u8), claim2.quality_adj_power);
+        let state : State = rt.get_state().unwrap();
+        assert_eq!(0, state.num_miners_meeting_min_power);
+
+        for miner in &[MINER_1, MINER_2, MINER_3] {
+            let miner_addr = Address::new_id(*miner);
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                StoragePower::default(),
+                power_unit.clone() ,
+            );
+        }
+        let state : State = rt.get_state().unwrap();
+        assert_eq!(3, state.num_miners_meeting_min_power);
+    }
+
+    #[test]
+    pub fn slash_miner_below_min(){
+        let bs = MemoryDB::default();
+        let mut rt = construct_runtime(&bs);
+        let owner = Address::new_id(OWNER);
+        let mut miner_seq = 0;
+        let power_unit = CONSENSUS_MINER_MIN_POWER.clone();
+        let small_power_unit = StoragePower::from(1_000_000u64);
+
+        
+        for miner in &[MINER_1, MINER_2, MINER_3] {
+            let miner_addr = Address::new_id(*miner);
+            create_miner_basic(
+                &mut rt,
+                &mut miner_seq,
+                owner.clone(),
+                owner.clone(),
+                miner_addr.clone(),
+            );
+            update_claimed_power(
+                &mut rt,
+                miner_addr,
+                power_unit.clone() ,
+                power_unit.clone(),
+            );
+        }
+
+        create_miner_basic(
+            &mut rt,
+            &mut miner_seq,
+            owner.clone(),
+            owner.clone(),
+            Address::new_id(MINER_4),
+        );
+        update_claimed_power(
+            &mut rt,
+            Address::new_id(MINER_4),
+            small_power_unit.clone() ,
+            small_power_unit.clone(),
+        );
+
+        expect_total_power_eager(&rt, &power_unit * 3, &power_unit * 3);
+
+        on_consensus_fault(&mut rt, Address::new_id(MINER_4), TokenAmount::default());
+        
+        expect_total_power_eager(&rt, &power_unit * 3, &power_unit * 3);
     }
 }
 
@@ -430,9 +647,16 @@ mod test_cron {
         let mut rt = construct_runtime(&bs);
         rt.epoch = 1;
         rt.expect_validate_caller_addr(&[CRON_ACTOR_ADDR.clone()]);
-        
-        let expected_power = Serialized::serialize(BigIntSer(&BigInt::from(0u8))).unwrap();
-        rt.expect_send(REWARD_ACTOR_ADDR.clone(), RewardMethod::UpdateNetworkKPI as u64 , expected_power, TokenAmount::from(0u8), Serialized::default(), ExitCode::Ok);
+
+        let expected_power = Serialized::serialize(BigIntSer(&StoragePower::from(0u8))).unwrap();
+        rt.expect_send(
+            REWARD_ACTOR_ADDR.clone(),
+            RewardMethod::UpdateNetworkKPI as u64,
+            expected_power,
+            TokenAmount::from(0u8),
+            Serialized::default(),
+            ExitCode::Ok,
+        );
         rt.set_caller(CRON_ACTOR_CODE_ID.clone(), CRON_ACTOR_ADDR.clone());
 
         assert!(rt

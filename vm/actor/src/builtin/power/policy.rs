@@ -12,6 +12,7 @@ const SECTOR_QUALITY_PRECISION: usize = 20; // PARAM_FINISH
 const BASE_MULTIPLIER: usize = 10; // PARAM_FINISH
 const DEAL_WEIGHT_MULTIPLIER: usize = 11; // PARAM_FINISH
 const VERIFIED_DEAL_WEIGHT_MULITPLIER: usize = 100; // PARAM_FINISH
+pub const CONSENSUS_MINER_MIN_MINERS: usize = 3;
 
 lazy_static! {
     /// Minimum power of an individual miner to meet the threshold for leader election.

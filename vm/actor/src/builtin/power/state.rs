@@ -1,7 +1,7 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use super::CONSENSUS_MINER_MIN_POWER;
+use super::{CONSENSUS_MINER_MIN_MINERS, CONSENSUS_MINER_MIN_POWER};
 use crate::{BytesKey, Multimap, HAMT_BIT_WIDTH};
 use address::Address;
 use cid::Cid;
@@ -21,6 +21,13 @@ pub struct State {
     pub total_raw_byte_power: StoragePower,
     #[serde(with = "bigint_ser")]
     pub total_quality_adj_power: StoragePower,
+
+    //Commited fields includes claims from miners below min power threshold
+    #[serde(with = "bigint_ser")]
+    pub total_bytes_commited: StoragePower,
+    #[serde(with = "bigint_ser")]
+    pub total_qa_bytes_commited: StoragePower,
+
     #[serde(with = "bigint_ser")]
     pub total_pledge_collateral: TokenAmount,
     pub miner_count: i64,
@@ -59,38 +66,33 @@ impl State {
         power: &StoragePower,
         qa_power: &StoragePower,
     ) -> Result<(), String> {
-        let mut claim = self
+        let mut old_claim = self
             .get_claim(store, miner)?
             .ok_or(format!("no claim for actor {}", miner))?;
 
-        let old_nominal_power = claim.quality_adj_power.clone();
+        let new_claim = Claim{
+            raw_byte_power : &old_claim.raw_byte_power + power,
+            quality_adj_power : &old_claim.quality_adj_power + qa_power,
+        };
 
-        // update power
-        claim.raw_byte_power += power;
-        claim.quality_adj_power += qa_power;
-
-        let new_nominal_power = &claim.quality_adj_power;
+        //Update commited
+        self.total_bytes_commited += power;
+        self.total_qa_bytes_commited += qa_power;
 
         let min_power_ref: &StoragePower = &*CONSENSUS_MINER_MIN_POWER;
-        let prev_below: bool = &old_nominal_power < min_power_ref;
-        let still_below: bool = new_nominal_power < min_power_ref;
+        let prev_below: bool = old_claim.quality_adj_power < min_power_ref.to_owned();
+        let still_below: bool = new_claim.quality_adj_power < min_power_ref.to_owned();
 
         if prev_below && !still_below {
             // Just passed min miner size
             self.num_miners_meeting_min_power += 1;
-            self.total_quality_adj_power += new_nominal_power;
-            self.total_raw_byte_power += &claim.raw_byte_power;
+            self.total_quality_adj_power += &new_claim.quality_adj_power;
+            self.total_raw_byte_power += &new_claim.raw_byte_power;
         } else if !prev_below && still_below {
             // just went below min miner size
             self.num_miners_meeting_min_power -= 1;
-            self.total_quality_adj_power = self
-                .total_quality_adj_power
-                .checked_sub(&old_nominal_power)
-                .ok_or("Negative nominal power")?;
-            self.total_raw_byte_power = self
-                .total_raw_byte_power
-                .checked_sub(&claim.raw_byte_power)
-                .ok_or("Negative raw byte power")?;
+            self.total_quality_adj_power -= old_claim.quality_adj_power;
+            self.total_raw_byte_power -= old_claim.raw_byte_power;
         } else if !prev_below && !still_below {
             // Was above the threshold, still above
             self.total_quality_adj_power += qa_power;
@@ -104,7 +106,11 @@ impl State {
             ));
         }
 
-        self.set_claim(store, miner, claim)
+        assert!(new_claim.raw_byte_power >= StoragePower::from(0u8));
+        assert!(new_claim.quality_adj_power >= StoragePower::from(0u8));
+        assert!(self.num_miners_meeting_min_power >= 0);
+
+        self.set_claim(store, miner, new_claim)
     }
 
     pub(super) fn add_pledge_total(&mut self, amount: TokenAmount) {
@@ -196,6 +202,19 @@ impl State {
         map.delete(&addr.to_bytes())?;
         self.claims = map.flush()?;
         Ok(())
+    }
+
+    pub fn current_total_power(&self) -> (StoragePower, StoragePower) {
+        if self.num_miners_meeting_min_power < CONSENSUS_MINER_MIN_MINERS as i64 {
+            return (
+                self.total_bytes_commited.clone(),
+                self.total_qa_bytes_commited.clone(),
+            );
+        }
+        (
+            self.total_raw_byte_power.clone(),
+            self.total_quality_adj_power.clone(),
+        )
     }
 }
 

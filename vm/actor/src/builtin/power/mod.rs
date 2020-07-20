@@ -12,9 +12,10 @@ use crate::reward::Method as RewardMethod;
 use crate::{
     check_empty_params, init,
     init::{ExecParams as InitExecParams, Method as InitMethod},
-    miner::{Method as MinerMethod},
-    make_map, request_miner_control_addrs, Multimap, SetMultimap, CALLER_TYPES_SIGNABLE,
-    CRON_ACTOR_ADDR, INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID, REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR, 
+    make_map,
+    miner::Method as MinerMethod,
+    request_miner_control_addrs, Multimap, SetMultimap, CALLER_TYPES_SIGNABLE, CRON_ACTOR_ADDR,
+    INIT_ACTOR_ADDR, MINER_ACTOR_CODE_ID, REWARD_ACTOR_ADDR, SYSTEM_ACTOR_ADDR,
 };
 use address::Address;
 use fil_types::{SealVerifyInfo, StoragePower};
@@ -129,22 +130,28 @@ impl Actor {
             robust_address: addresses.robust_address,
         })
     }
-    
-    pub fn update_claimed_power<BS, RT> (rt : &mut RT, params : UpdateClaimedPowerParams) -> Result<(), ActorError>
+
+    pub fn update_claimed_power<BS, RT>(
+        rt: &mut RT,
+        params: UpdateClaimedPowerParams,
+    ) -> Result<(), ActorError>
     where
         BS: BlockStore,
         RT: Runtime<BS>,
     {
-
         rt.validate_immediate_caller_type(&[MINER_ACTOR_CODE_ID.clone()])?;
         let miner_addr = rt.message().from().clone();
 
         rt.transaction(|st: &mut State, rt| {
-            st.add_to_claim(rt.store(), &miner_addr, &params.raw_byte_power, &params.quality_adj_delta).map_err(|x| ActorError::new(ExitCode::ErrForbidden, x))
+            st.add_to_claim(
+                rt.store(),
+                &miner_addr,
+                &params.raw_byte_power,
+                &params.quality_adj_delta,
+            )
+            .map_err(|x| ActorError::new(ExitCode::ErrForbidden, x))
         })?
     }
-
-
 
     pub fn delete_miner<BS, RT>(rt: &mut RT, params: DeleteMinerParams) -> Result<(), ActorError>
     where
@@ -364,12 +371,12 @@ impl Actor {
         })?
     }
 
-
     #[allow(dead_code)]
-    fn process_deferred_cron_events<BS, RT>(rt : &mut RT)-> Result<(), ActorError>
+    fn process_deferred_cron_events<BS, RT>(rt: &mut RT) -> Result<(), ActorError>
     where
-    BS : BlockStore,
-    RT : Runtime<BS>,{
+        BS: BlockStore,
+        RT: Runtime<BS>,
+    {
         let rt_epoch = rt.curr_epoch();
         let cron_events = rt
             .transaction::<_, Result<_, String>, _>(|st: &mut State, rt| {
@@ -397,13 +404,13 @@ impl Actor {
             })?;
 
         let mut failed_miner_crons: Vec<Address> = Vec::new();
-        for event in cron_events{
-            if let Err(_) =  rt.send(
+        for event in cron_events {
+            if let Err(_) = rt.send(
                 &event.miner_addr,
-                MinerMethod::OnDeferredCronEvent as u64 ,
+                MinerMethod::OnDeferredCronEvent as u64,
                 &event.callback_payload,
-                &TokenAmount::default()
-            ){
+                &TokenAmount::default(),
+            ) {
                 failed_miner_crons.extend_from_slice(&[event.miner_addr]);
                 // If a callback fails, this actor continues to invoke other callbacks
                 // and persists state removing the failed event from the event queue. It won't be tried again.
@@ -413,10 +420,9 @@ impl Actor {
             }
         }
 
-        rt.transaction::<_, Result<_, ActorError>, _>(|st: &mut State, rt|{
-
+        rt.transaction::<_, Result<_, ActorError>, _>(|st: &mut State, rt| {
             let store = rt.store();
-            for miner_addr in failed_miner_crons{
+            for miner_addr in failed_miner_crons {
                 // let ret = st.get_claim(store, &miner_addr);
 
                 // if ret.is_err(){
@@ -505,16 +511,16 @@ impl Actor {
     {
         rt.validate_immediate_caller_type(std::iter::once(&*MINER_ACTOR_CODE_ID))?;
         let miner_addr = *rt.message().from();
-        let st: State = rt.state()?;
 
-        let claim = st
-            .get_claim(rt.store(), &miner_addr)
+        rt.transaction::<State, Result<(), ActorError>, _>( |st: &mut State, rt : &mut RT|  {
+            let claim: Claim = st.get_claim(rt.store(), &miner_addr)
+
             .map_err(|e| {
-                ActorError::new(
-                    ExitCode::ErrIllegalState,
-                    format!("failed to read claimed power for fault: {}", e),
-                )
-            })?
+                    ActorError::new(
+                        ExitCode::ErrIllegalState,
+                        format!("failed to read claimed power for fault: {}", e),
+                    )
+                })?
             .ok_or_else(|| {
                 ActorError::new(
                     ExitCode::ErrIllegalArgument,
@@ -522,12 +528,11 @@ impl Actor {
                 )
             })?;
 
-        rt.transaction(|st: &mut State, _| {
-            st.total_quality_adj_power -= claim.quality_adj_power;
-            st.total_raw_byte_power -= claim.raw_byte_power;
-
+            assert!(st.add_to_claim(rt.store(), &miner_addr,  &claim.quality_adj_power , &claim.raw_byte_power).is_ok());
+             
             st.add_pledge_total(pledge_amount);
-        })?;
+            Ok(())
+        })??;
 
         Self::delete_miner_actor(rt, &miner_addr)?;
 
@@ -726,8 +731,8 @@ impl ActorCode for Actor {
                 Ok(Serialized::serialize(v)?)
             }
 
-            Some(Method::UpdateClaimedPower) =>{
-                Self::update_claimed_power(rt , params.deserialize()?)?;
+            Some(Method::UpdateClaimedPower) => {
+                Self::update_claimed_power(rt, params.deserialize()?)?;
                 Ok(Serialized::default())
                 //let v = Self::
             }

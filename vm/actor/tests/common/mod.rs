@@ -53,6 +53,9 @@ pub struct MockRuntime<'a, BS: BlockStore> {
     pub expect_verify_post: RefCell<Option<ExpectVerifyPoSt>>,
     pub expect_compute_unsealed_sector_cid: RefCell<Option<ExpectComputeUnsealedSectorCid>>,
     pub expect_verify_consensus_fault: RefCell<Option<ExpectVerifyConsensusFault>>,
+
+    // Gas charged through rt.charge gas
+    pub gas_charged : i64,
 }
 
 #[derive(Clone, Debug)]
@@ -146,6 +149,7 @@ where
             expect_verify_post: RefCell::new(None),
             expect_compute_unsealed_sector_cid: RefCell::new(None),
             expect_verify_consensus_fault: RefCell::new(None),
+            gas_charged : 0,
         }
     }
     fn require_in_call(&self) {
@@ -180,8 +184,12 @@ where
         assert!(addr.len() > 0, "addrs must be non-empty");
         *self.expect_validate_caller_addr.borrow_mut() = Some(addr.to_vec());
     }
-
     
+    #[allow(dead_code)]
+    pub fn expect_gas_charged(&self, gas : i64) {
+        assert!(self.gas_charged != gas);
+    }
+
     #[allow(dead_code)]
     pub fn set_recieved(&mut self, value: TokenAmount) {
         self.received = value.clone();

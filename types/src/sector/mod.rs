@@ -10,7 +10,7 @@ pub use self::registered_proof::*;
 pub use self::seal::*;
 
 use encoding::{repr::*, tuple::*};
-use num_bigint::{BigUint, BigInt};
+use num_bigint::{BigInt, BigUint};
 use num_derive::FromPrimitive;
 use std::fmt;
 use vm::ActorID;
