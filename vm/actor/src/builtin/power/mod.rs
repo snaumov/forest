@@ -372,6 +372,54 @@ impl Actor {
     }
 
     #[allow(dead_code)]
+    fn process_batch_proof_verifies<BS, RT>(rt: &mut RT) -> Result<(), ActorError>
+    where
+        BS: BlockStore,
+        RT: Runtime<BS>,
+    {
+        let miners: Vec<Address> = vec![];
+
+        rt.transaction::<_, Result<_, ActorError>, _>(|st: &mut State, rt| {
+            if let Some(c) = &st.proof_validation_batch {
+                let mmap = Multimap::from_root(rt.store(), &c).map_err(|_| {
+                    ActorError::new(
+                        ExitCode::ErrIllegalState,
+                        format!("failed to load proof batching set"),
+                    )
+                })?;
+
+                // For all call
+                // err = mmap.ForAll(func(k string, arr *adt.Array) error {
+                //     a, err := address.NewFromBytes([]byte(k))
+                //     if err != nil {
+                //         return xerrors.Errorf("failed to parse address key: %w", err)
+                //     }
+
+                //     miners = append(miners, a)
+
+                //     var infos []abi.SealVerifyInfo
+                //     var svi abi.SealVerifyInfo
+                //     err = arr.ForEach(&svi, func(i int64) error {
+                //         infos = append(infos, svi)
+                //         return nil
+                //     })
+                //     if err != nil {
+                //         return xerrors.Errorf("failed to iterate over proof verify array for miner %s: %w", a, err)
+                //     }
+                //     verifies[a] = infos
+                //     return nil
+                // })
+
+                st.proof_validation_batch = None;
+            }
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     fn process_deferred_cron_events<BS, RT>(rt: &mut RT) -> Result<(), ActorError>
     where
         BS: BlockStore,
@@ -423,25 +471,26 @@ impl Actor {
         rt.transaction::<_, Result<_, ActorError>, _>(|st: &mut State, rt| {
             let store = rt.store();
             for miner_addr in failed_miner_crons {
-                // let ret = st.get_claim(store, &miner_addr);
+                let ret = st.get_claim(store, &miner_addr).map_err(|e| {
+                    ActorError::new(
+                        ExitCode::ErrIllegalState,
+                        format!("Failed to clear cron events: {}", e),
+                    )
+                })?;
 
-                // if ret.is_err(){
-                //     println!("Failed to get claim for miner afte rfailing OnDefferedCronEvent");
-                // }
-                // else if ret.unwrap().is_none(){
-                //     println!("Miner OnDefferedCronEvent failed for miner");
-                // }
-
-                // else{
-                //     let claim = ret.unwrap().unwrap();
-                //     let g = claim.raw_byte_power.to_owned();
-                // // if st.add_to_claim(store, &miner_addr,  g * -1, claim.quality_adj_power.to_owned() * -1).is_err(){
-                // //     println!("Failed to remove");
-                // // }
-                // }
+                if let Some(claim) = ret {
+                    if let Err(_) = st.add_to_claim(
+                        store,
+                        &miner_addr,
+                        &claim.raw_byte_power,
+                        &claim.quality_adj_power,
+                    ) {
+                        println!("Failed to remove power");
+                    }
+                }
             }
             Ok(())
-        });
+        })??;
         Ok(())
     }
 
