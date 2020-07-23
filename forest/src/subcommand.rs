@@ -5,8 +5,6 @@ use super::cli::Subcommand;
 use super::paramfetch::{get_params_default, SectorSizeOpt};
 use fil_types::SectorSize;
 use rpc_client::{chain_get_genesis};
-use log::info;
-use jsonrpc_core::futures::future::{self, Future, FutureResult};
 
 /// Converts a human readable string to a u64 size.
 fn ram_to_int(size: &str) -> Result<SectorSize, String> {
@@ -57,7 +55,8 @@ pub(super) async fn process(command: Subcommand) {
             get_genesis
         } => {
             if get_genesis {
-                chain_get_genesis();
+                let gen = chain_get_genesis();
+                println!("{:#?}", gen);
             };
         }
     }
