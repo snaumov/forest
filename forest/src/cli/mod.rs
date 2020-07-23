@@ -47,6 +47,15 @@ pub enum Subcommand {
         #[structopt(short, long, help = "Show verbose logging")]
         verbose: bool,
     },
+    // EXAMPLE
+    #[structopt(
+        name = "chain",
+        about = "Manage chain operations"
+    )]
+    ChainParams {
+        #[structopt(short, long, help = "Print genesis block")]
+        get_genesis: bool,
+    }
 }
 
 /// Daemon process command line options.
@@ -60,6 +69,7 @@ pub struct DaemonOpts {
     pub rpc: Option<bool>,
     #[structopt(short, long, help = "The port used for communication")]
     pub port: Option<String>,
+
 }
 
 impl DaemonOpts {

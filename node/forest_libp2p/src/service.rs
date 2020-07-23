@@ -84,6 +84,7 @@ pub enum NetworkMessage {
         request: HelloRequest,
     },
 }
+
 /// The Libp2pService listens to events from the Libp2p swarm.
 pub struct Libp2pService<DB: BlockStore> {
     pub swarm: Swarm<ForestBehaviour>,
@@ -115,7 +116,6 @@ where
             let be = ForestBehaviour::new(&net_keypair, &config, network_name);
             Swarm::new(transport, be, peer_id)
         };
-
         Swarm::listen_on(&mut swarm, config.listening_multiaddr).unwrap();
 
         // Subscribe to gossipsub topics with the network name suffix

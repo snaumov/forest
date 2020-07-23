@@ -19,11 +19,17 @@ const DEFAULT_BOOTSTRAP: &[&str] = &[
     "/ip4/136.144.49.131/tcp/1347/p2p/12D3KooW9szZmKttS9A1FafH3Zc2pxKwwmvCWCGKkRP4KmbhhC4R",
 ];
 
+/// Network service configuration.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Libp2pConfig {
+    /// Multiaddresses to listen for incoming connections.
     pub listening_multiaddr: Multiaddr,
+    /// List of initial node addresses
     pub bootstrap_peers: Vec<Multiaddr>,
+    // /// If true, the network will use mDNS to discover other libp2p nodes on the local network
+    // /// and connect to them if they support the same chain.
+    // pub enable_mdns: bool,
 }
 
 impl Default for Libp2pConfig {

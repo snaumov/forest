@@ -318,7 +318,7 @@ impl ForestBehaviour {
 
         let hp = std::iter::once((HelloProtocolName, ProtocolSupport::Full));
         let bp = std::iter::once((BlockSyncProtocolName, ProtocolSupport::Full));
-
+        
         ForestBehaviour {
             gossipsub: Gossipsub::new(local_peer_id, gossipsub_config),
             mdns: Mdns::new().expect("Could not start mDNS"),
