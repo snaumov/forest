@@ -1,14 +1,16 @@
 // Copyright 2020 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-mod chain_cmd;
 mod config;
+mod chain_cmd;
+mod wallet_cmd;
 mod fetch_params_cmd;
 mod genesis;
 
 pub(super) use self::chain_cmd::ChainCommands;
-pub use self::config::Config;
+pub(super) use self::wallet_cmd::WalletCommands;
 pub(super) use self::fetch_params_cmd::FetchCommands;
+pub use self::config::Config;
 pub(super) use self::genesis::initialize_genesis;
 
 use std::cell::RefCell;
@@ -46,6 +48,9 @@ pub enum Subcommand {
 
     #[structopt(name = "chain", about = "Interact with Filecoin blockchain")]
     Chain(ChainCommands),
+
+    #[structopt(name = "wallet", about = "Manages wallet")]
+    Wallet(WalletCommands)
 }
 
 /// Daemon process command line options.

@@ -37,6 +37,26 @@ jsonrpsee::rpc_api! {
 
         #[rpc(method = "Filecoin.ChainGetObj")]
         fn chain_read_obj(cid: String) -> Vec<u8>;
+
+        /// Wallet
+        #[rpc(method = "Filecoin.WalletNew")]
+        fn wallet_new() -> String;
+        #[rpc(method = "Filecoin.WalletList")]
+        fn wallet_list() -> Vec<String>;
+        #[rpc(method = "Filecoin.WalletBalance")]
+        fn wallet_balance() -> String;
+        #[rpc(method = "Filecoin.WalletSetDefault")]
+        fn wallet_set_default();
+        #[rpc(method = "Filecoin.WalletDefault")]
+        fn wallet_default() -> String;
+        #[rpc(method = "Filecoin.WalletSign")]
+        fn wallet_sign() -> SignatureJson;
+        #[rpc(method = "Filecoin.WalletVerify")]
+        fn wallet_verify() -> bool;
+        #[rpc(method = "Filecoin.WalletImport")]
+        fn wallet_import() -> String;
+        #[rpc(method = "Filecoin.WalletExport")]
+        fn wallet_export() -> KeyInfoJson;
     }
 }
 
